@@ -1,1 +1,13 @@
 project_id = "xwdzuyuvngyziokwuigu"
+
+[functions.scrape-jobs]
+verify_jwt = false
+
+[functions.generate-email]
+verify_jwt = false
+
+[functions.send-application]
+verify_jwt = false
+
+[functions.automate-applications]
+verify_jwt = false
