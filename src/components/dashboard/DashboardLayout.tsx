@@ -2,21 +2,24 @@ import { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Briefcase, 
   LayoutDashboard, 
   Settings, 
   FileText, 
   LogOut,
-  User
+  User,
+  Bot
 } from "lucide-react";
 import { toast } from "sonner";
 
 interface DashboardLayoutProps {
   children: ReactNode;
+  automationContent?: ReactNode;
 }
 
-const DashboardLayout = ({ children }: DashboardLayoutProps) => {
+const DashboardLayout = ({ children, automationContent }: DashboardLayoutProps) => {
   const navigate = useNavigate();
 
   const handleLogout = async () => {
@@ -70,7 +73,34 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
       </header>
 
       <main className="container mx-auto px-4 py-8">
-        {children}
+        <Tabs defaultValue="overview" className="w-full">
+          <TabsList className="mb-6">
+            <TabsTrigger value="overview">
+              <LayoutDashboard className="mr-2 h-4 w-4" />
+              Overview
+            </TabsTrigger>
+            <TabsTrigger value="automation">
+              <Bot className="mr-2 h-4 w-4" />
+              Automation
+            </TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="overview">
+            {children}
+          </TabsContent>
+          
+          <TabsContent value="automation">
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-3xl font-bold">Job Application Automation</h2>
+                <p className="text-muted-foreground mt-2">
+                  Automatically scrape jobs, generate personalized emails with AI, and send applications
+                </p>
+              </div>
+              {automationContent}
+            </div>
+          </TabsContent>
+        </Tabs>
       </main>
     </div>
   );

@@ -7,6 +7,7 @@ import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import DashboardStats from "@/components/dashboard/DashboardStats";
 import JobListings from "@/components/dashboard/JobListings";
 import OnboardingFlow from "@/components/dashboard/OnboardingFlow";
+import { AutomationControls } from "@/components/dashboard/AutomationControls";
 
 const Dashboard = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -70,7 +71,7 @@ const Dashboard = () => {
   }
 
   return (
-    <DashboardLayout>
+    <DashboardLayout automationContent={<AutomationControls />}>
       <div className="space-y-6">
         <DashboardStats />
         <JobListings />
