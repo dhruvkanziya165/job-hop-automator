@@ -8,10 +8,27 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { User, Briefcase, Target, CheckCircle } from "lucide-react";
+import { z } from "zod";
 
 interface OnboardingFlowProps {
   onComplete: () => void;
 }
+
+// Validation schemas
+const profileSchema = z.object({
+  fullName: z.string().trim().min(2, "Name must be at least 2 characters").max(100, "Name must be less than 100 characters"),
+  phone: z.string().trim().regex(/^(\+?[1-9]\d{0,14})?$/, "Invalid phone number format").optional().or(z.literal("")),
+  linkedinUrl: z.string().trim().url("Invalid URL format").optional().or(z.literal("")),
+  portfolioUrl: z.string().trim().url("Invalid URL format").optional().or(z.literal("")),
+});
+
+const preferencesSchema = z.object({
+  targetRoles: z.string().trim().min(1, "At least one target role is required").max(500, "Target roles must be less than 500 characters"),
+  locations: z.string().trim().min(1, "At least one location is required").max(500, "Locations must be less than 500 characters"),
+  salaryMin: z.string().trim().regex(/^\d*$/, "Salary must be a valid number").refine((val) => !val || (parseInt(val) >= 0 && parseInt(val) <= 10000000), "Salary must be between 0 and 10,000,000"),
+  keywords: z.string().trim().max(1000, "Keywords must be less than 1000 characters").optional().or(z.literal("")),
+  excludeCompanies: z.string().trim().max(1000, "Excluded companies must be less than 1000 characters").optional().or(z.literal("")),
+});
 
 const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
   const [step, setStep] = useState(1);
@@ -30,6 +47,16 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
   });
 
   const handleProfileSubmit = async () => {
+    // Validate profile data
+    try {
+      profileSchema.parse(profile);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        toast.error(error.errors[0].message);
+        return;
+      }
+    }
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
@@ -37,9 +64,9 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
       .from("profiles")
       .update({
         full_name: profile.fullName,
-        phone: profile.phone,
-        linkedin_url: profile.linkedinUrl,
-        portfolio_url: profile.portfolioUrl,
+        phone: profile.phone || null,
+        linkedin_url: profile.linkedinUrl || null,
+        portfolio_url: profile.portfolioUrl || null,
       })
       .eq("id", user.id);
 
@@ -52,17 +79,33 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
   };
 
   const handlePreferencesSubmit = async () => {
+    // Validate preferences data
+    try {
+      preferencesSchema.parse(preferences);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        toast.error(error.errors[0].message);
+        return;
+      }
+    }
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
+
+    const salaryMinValue = preferences.salaryMin ? parseInt(preferences.salaryMin) : null;
+    if (salaryMinValue !== null && (isNaN(salaryMinValue) || salaryMinValue < 0)) {
+      toast.error("Invalid salary value");
+      return;
+    }
 
     const { error } = await supabase
       .from("user_preferences")
       .insert({
         user_id: user.id,
-        target_roles: preferences.targetRoles.split(",").map((r) => r.trim()),
-        locations: preferences.locations.split(",").map((l) => l.trim()),
-        salary_min: preferences.salaryMin ? parseInt(preferences.salaryMin) : null,
-        keywords: preferences.keywords.split(",").map((k) => k.trim()),
+        target_roles: preferences.targetRoles.split(",").map((r) => r.trim()).filter((r) => r),
+        locations: preferences.locations.split(",").map((l) => l.trim()).filter((l) => l),
+        salary_min: salaryMinValue,
+        keywords: preferences.keywords.split(",").map((k) => k.trim()).filter((k) => k),
         exclude_companies: preferences.excludeCompanies
           .split(",")
           .map((c) => c.trim())
