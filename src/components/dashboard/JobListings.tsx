@@ -149,19 +149,15 @@ const JobListings = () => {
                 </div>
                 <div className="flex gap-2">
                   <Button
-                    variant="outline"
                     size="sm"
-                    onClick={() => window.open(job.url, "_blank")}
+                    className="bg-gradient-primary flex-1"
+                    onClick={() => {
+                      window.open(job.url, "_blank");
+                      handleApply(job.id);
+                    }}
                   >
                     <ExternalLink className="h-4 w-4 mr-2" />
-                    View Job
-                  </Button>
-                  <Button
-                    size="sm"
-                    className="bg-gradient-primary"
-                    onClick={() => handleApply(job.id)}
-                  >
-                    Quick Apply
+                    Apply Now
                   </Button>
                 </div>
               </div>
