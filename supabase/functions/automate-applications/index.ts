@@ -94,11 +94,17 @@ serve(async (req) => {
 
     const appliedJobIds = appliedJobs?.map(app => app.job_id) || [];
 
-    const { data: availableJobs, error: jobsError } = await serviceSupabase
+    // Build query for available jobs
+    let query = serviceSupabase
       .from("job_postings")
-      .select("*")
-      .not("id", "in", `(${appliedJobIds.join(",") || "''"})`)
-      .limit(dailyLimit - todayCount);
+      .select("*");
+
+    // Only add the exclusion filter if there are applied jobs
+    if (appliedJobIds.length > 0) {
+      query = query.not("id", "in", `(${appliedJobIds.join(",")})`);
+    }
+
+    const { data: availableJobs, error: jobsError } = await query.limit(dailyLimit - todayCount);
 
     if (jobsError) {
       throw new Error(`Failed to fetch available jobs: ${jobsError.message}`);
