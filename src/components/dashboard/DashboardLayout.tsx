@@ -10,7 +10,8 @@ import {
   FileText, 
   LogOut,
   User,
-  Bot
+  Bot,
+  BarChart3
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -49,6 +50,10 @@ const DashboardLayout = ({ children, automationContent }: DashboardLayoutProps) 
               <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard")}>
                 <LayoutDashboard className="h-4 w-4 mr-2" />
                 Dashboard
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => navigate("/analytics")}>
+                <BarChart3 className="h-4 w-4 mr-2" />
+                Analytics
               </Button>
               <Button variant="ghost" size="sm" onClick={() => navigate("/profile")}>
                 <User className="h-4 w-4 mr-2" />
