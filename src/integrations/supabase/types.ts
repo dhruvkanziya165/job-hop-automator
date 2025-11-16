@@ -113,6 +113,7 @@ export type Database = {
           external_id: string | null
           fetched_at: string
           id: string
+          job_type: string | null
           location: string | null
           posted_date: string | null
           salary_range: string | null
@@ -127,6 +128,7 @@ export type Database = {
           external_id?: string | null
           fetched_at?: string
           id?: string
+          job_type?: string | null
           location?: string | null
           posted_date?: string | null
           salary_range?: string | null
@@ -141,6 +143,7 @@ export type Database = {
           external_id?: string | null
           fetched_at?: string
           id?: string
+          job_type?: string | null
           location?: string | null
           posted_date?: string | null
           salary_range?: string | null
@@ -224,6 +227,7 @@ export type Database = {
           exclude_companies: string[]
           id: string
           is_active: boolean | null
+          job_type: string | null
           keywords: string[]
           locations: string[]
           salary_max: number | null
@@ -239,6 +243,7 @@ export type Database = {
           exclude_companies?: string[]
           id?: string
           is_active?: boolean | null
+          job_type?: string | null
           keywords?: string[]
           locations?: string[]
           salary_max?: number | null
@@ -254,6 +259,7 @@ export type Database = {
           exclude_companies?: string[]
           id?: string
           is_active?: boolean | null
+          job_type?: string | null
           keywords?: string[]
           locations?: string[]
           salary_max?: number | null

@@ -14,6 +14,7 @@ interface JobPosting {
   url: string;
   salary_range?: string;
   posted_date: string;
+  job_type?: string;
 }
 
 // Job board URLs to scrape using Firecrawl
@@ -30,8 +31,8 @@ serve(async (req) => {
   }
 
   try {
-    const { source, keywords } = await req.json();
-    console.log(`Scraping jobs from ${source} with keywords:`, keywords);
+    const { source, keywords, location, jobType } = await req.json();
+    console.log(`Scraping jobs from ${source} with keywords:`, keywords, `location:`, location, `type:`, jobType);
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
@@ -78,16 +79,47 @@ serve(async (req) => {
       try {
         console.log(`Scraping ${boardName} from ${boardUrl}`);
         
-        // Build search URL with keywords
+        // Build search URL with keywords, location, and job type
         let searchUrl = boardUrl;
+        const params: string[] = [];
+        
         if (keywords && keywords.length > 0) {
           const keywordQuery = keywords.join("+");
-          if (boardName === "internshala") {
-            searchUrl = `${boardUrl}keywords-${keywordQuery}/`;
-          } else if (boardName === "linkedin") {
-            searchUrl = `${boardUrl}?keywords=${keywordQuery}&f_TPR=r86400`;
-          } else {
-            searchUrl = `${boardUrl}?q=${keywordQuery}`;
+          params.push(`keywords=${keywordQuery}`);
+        }
+        
+        if (location && location !== "any") {
+          params.push(`location=${encodeURIComponent(location)}`);
+        }
+        
+        // Build URL based on board
+        if (boardName === "internshala") {
+          let internshalaUrl = boardUrl;
+          if (keywords && keywords.length > 0) {
+            internshalaUrl += `keywords-${keywords.join("-")}/`;
+          }
+          if (location && location !== "any") {
+            internshalaUrl += `location-${location.toLowerCase().replace(/\s+/g, "-")}/`;
+          }
+          searchUrl = internshalaUrl;
+        } else if (boardName === "linkedin") {
+          const linkedinParams = [`f_TPR=r86400`];
+          if (keywords && keywords.length > 0) {
+            linkedinParams.push(`keywords=${keywords.join("+")}`);
+          }
+          if (location && location !== "any") {
+            linkedinParams.push(`location=${encodeURIComponent(location)}`);
+          }
+          if (jobType === "internship") {
+            linkedinParams.push(`f_JT=I`);
+          } else if (jobType === "job") {
+            linkedinParams.push(`f_JT=F`);
+          }
+          searchUrl = `${boardUrl}?${linkedinParams.join("&")}`;
+        } else {
+          // RemoteOK and Wellfound
+          if (params.length > 0) {
+            searchUrl = `${boardUrl}?${params.join("&")}`;
           }
         }
 
@@ -122,7 +154,8 @@ serve(async (req) => {
         const jobs = parseJobsFromContent(
           scrapeData.data.markdown || "", 
           boardName, 
-          boardUrl
+          boardUrl,
+          jobType
         );
         allJobs = allJobs.concat(jobs);
         
@@ -151,6 +184,7 @@ serve(async (req) => {
                    job.url.includes("wellfound") ? "Wellfound" :
                    job.url.includes("linkedin") ? "LinkedIn" : "Other",
             salary_range: job.salary_range,
+            job_type: job.job_type || "job",
             external_id: `${job.company}-${job.title}-${Date.now()}`.replace(/\s+/g, "-").toLowerCase(),
             posted_date: job.posted_date,
             fetched_at: new Date().toISOString(),
@@ -191,7 +225,7 @@ serve(async (req) => {
 });
 
 // Helper function to parse jobs from scraped content
-function parseJobsFromContent(content: string, source: string, baseUrl: string): JobPosting[] {
+function parseJobsFromContent(content: string, source: string, baseUrl: string, requestedJobType?: string): JobPosting[] {
   const jobs: JobPosting[] = [];
   
   // Split content into sections
@@ -209,6 +243,24 @@ function parseJobsFromContent(content: string, source: string, baseUrl: string):
     
     // Only create job posting if we have at least a title and company or URL
     if (titleMatch && (companyMatch || urlMatch)) {
+      const title = titleMatch[1].trim().toLowerCase();
+      const isInternship = title.includes("intern") || source === "internshala";
+      
+      // Determine job type
+      let detectedJobType: string;
+      if (isInternship) {
+        detectedJobType = "internship";
+      } else {
+        detectedJobType = "job";
+      }
+      
+      // Filter by requested job type
+      if (requestedJobType && requestedJobType !== "both") {
+        if (requestedJobType !== detectedJobType) {
+          continue; // Skip this job if it doesn't match the requested type
+        }
+      }
+      
       jobs.push({
         title: titleMatch[1].trim(),
         company: companyMatch ? companyMatch[1].trim() : "Unknown Company",
@@ -217,6 +269,7 @@ function parseJobsFromContent(content: string, source: string, baseUrl: string):
         url: urlMatch ? urlMatch[1] : baseUrl,
         salary_range: salaryMatch ? salaryMatch[0].trim() : undefined,
         posted_date: new Date().toISOString(),
+        job_type: detectedJobType,
       });
     }
   }
