@@ -44,6 +44,7 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
     salaryMin: "",
     keywords: "",
     excludeCompanies: "",
+    jobType: "both",
   });
 
   const handleProfileSubmit = async () => {
@@ -105,6 +106,7 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
         target_roles: preferences.targetRoles.split(",").map((r) => r.trim()).filter((r) => r),
         locations: preferences.locations.split(",").map((l) => l.trim()).filter((l) => l),
         salary_min: salaryMinValue,
+        job_type: preferences.jobType,
         keywords: preferences.keywords.split(",").map((k) => k.trim()).filter((k) => k),
         exclude_companies: preferences.excludeCompanies
           .split(",")
@@ -223,6 +225,36 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
         {/* Step 2: Job Preferences */}
         {step === 2 && (
           <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>I'm looking for</Label>
+              <div className="grid grid-cols-3 gap-2">
+                <Button
+                  type="button"
+                  variant={preferences.jobType === "internship" ? "default" : "outline"}
+                  onClick={() => setPreferences({ ...preferences, jobType: "internship" })}
+                  className="w-full"
+                >
+                  Internships
+                </Button>
+                <Button
+                  type="button"
+                  variant={preferences.jobType === "job" ? "default" : "outline"}
+                  onClick={() => setPreferences({ ...preferences, jobType: "job" })}
+                  className="w-full"
+                >
+                  Jobs
+                </Button>
+                <Button
+                  type="button"
+                  variant={preferences.jobType === "both" ? "default" : "outline"}
+                  onClick={() => setPreferences({ ...preferences, jobType: "both" })}
+                  className="w-full"
+                >
+                  Both
+                </Button>
+              </div>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="roles">Target Roles * (comma-separated)</Label>
               <Input

@@ -9,10 +9,10 @@ import {
   DollarSign, 
   ExternalLink,
   Clock,
-  Filter,
   Briefcase
 } from "lucide-react";
 import { toast } from "sonner";
+import JobFilters from "./JobFilters";
 
 interface Job {
   id: string;
@@ -24,22 +24,36 @@ interface Job {
   url: string;
   source: string;
   posted_date: string;
+  job_type: string;
 }
 
 const JobListings = () => {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filters, setFilters] = useState<{ location?: string; jobType?: string }>({ jobType: "both" });
 
   useEffect(() => {
     fetchJobs();
-  }, []);
+  }, [filters]);
 
   const fetchJobs = async () => {
-    const { data, error } = await supabase
+    let query = supabase
       .from("job_postings")
-      .select("*")
+      .select("*");
+    
+    // Apply location filter
+    if (filters.location) {
+      query = query.ilike("location", `%${filters.location}%`);
+    }
+    
+    // Apply job type filter
+    if (filters.jobType && filters.jobType !== "both") {
+      query = query.eq("job_type", filters.jobType);
+    }
+    
+    const { data, error } = await query
       .order("fetched_at", { ascending: false })
-      .limit(10);
+      .limit(50);
 
     if (error) {
       toast.error("Failed to fetch jobs");
@@ -99,11 +113,9 @@ const JobListings = () => {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">Matched Jobs</h2>
-        <Button variant="outline" size="sm">
-          <Filter className="h-4 w-4 mr-2" />
-          Filters
-        </Button>
       </div>
+      
+      <JobFilters onFilterChange={setFilters} currentFilters={filters} />
 
       <div className="grid gap-4">
         {jobs.map((job) => (
@@ -131,9 +143,14 @@ const JobListings = () => {
                     )}
                   </div>
                 </div>
-                <Badge variant="secondary" className="shrink-0">
-                  {job.source}
-                </Badge>
+                <div className="flex gap-2 shrink-0">
+                  <Badge variant="secondary">
+                    {job.source}
+                  </Badge>
+                  <Badge variant="outline">
+                    {job.job_type === "internship" ? "Internship" : "Job"}
+                  </Badge>
+                </div>
               </div>
 
               {job.description && (

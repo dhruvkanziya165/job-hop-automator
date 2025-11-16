@@ -43,8 +43,23 @@ export const AutomationControls = () => {
   const handleScrapeJobs = async () => {
     setIsScraping(true);
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      // Get user preferences
+      const { data: prefs } = await supabase
+        .from("user_preferences")
+        .select("*")
+        .eq("user_id", user.id)
+        .single();
+
       const { data, error } = await supabase.functions.invoke("scrape-jobs", {
-        body: { source: "all", keywords: [] },
+        body: {
+          source: "all",
+          keywords: prefs?.keywords || [],
+          location: prefs?.locations?.[0] || "any",
+          jobType: prefs?.job_type || "both",
+        },
       });
 
       if (error) throw error;

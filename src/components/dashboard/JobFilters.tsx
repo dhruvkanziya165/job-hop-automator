@@ -1,0 +1,98 @@
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { MapPin, Briefcase, X } from "lucide-react";
+import { useState } from "react";
+
+interface JobFiltersProps {
+  onFilterChange: (filters: { location?: string; jobType?: string }) => void;
+  currentFilters: { location?: string; jobType?: string };
+}
+
+const JobFilters = ({ onFilterChange, currentFilters }: JobFiltersProps) => {
+  const [locationInput, setLocationInput] = useState("");
+
+  const handleLocationAdd = () => {
+    if (locationInput.trim()) {
+      onFilterChange({ ...currentFilters, location: locationInput.trim() });
+      setLocationInput("");
+    }
+  };
+
+  const handleJobTypeChange = (type: string) => {
+    onFilterChange({ ...currentFilters, jobType: type });
+  };
+
+  const clearLocation = () => {
+    onFilterChange({ ...currentFilters, location: undefined });
+  };
+
+  return (
+    <div className="space-y-4 p-4 bg-card rounded-lg border">
+      <h3 className="font-semibold flex items-center gap-2">
+        <Briefcase className="h-4 w-4" />
+        Filter Jobs
+      </h3>
+
+      {/* Job Type Filter */}
+      <div>
+        <label className="text-sm font-medium mb-2 block">Job Type</label>
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant={currentFilters.jobType === "both" || !currentFilters.jobType ? "default" : "outline"}
+            onClick={() => handleJobTypeChange("both")}
+          >
+            All
+          </Button>
+          <Button
+            size="sm"
+            variant={currentFilters.jobType === "internship" ? "default" : "outline"}
+            onClick={() => handleJobTypeChange("internship")}
+          >
+            Internships
+          </Button>
+          <Button
+            size="sm"
+            variant={currentFilters.jobType === "job" ? "default" : "outline"}
+            onClick={() => handleJobTypeChange("job")}
+          >
+            Jobs
+          </Button>
+        </div>
+      </div>
+
+      {/* Location Filter */}
+      <div>
+        <label className="text-sm font-medium mb-2 block flex items-center gap-2">
+          <MapPin className="h-4 w-4" />
+          Location
+        </label>
+        <div className="flex gap-2">
+          <Input
+            placeholder="Enter city or country"
+            value={locationInput}
+            onChange={(e) => setLocationInput(e.target.value)}
+            onKeyPress={(e) => e.key === "Enter" && handleLocationAdd()}
+          />
+          <Button size="sm" onClick={handleLocationAdd}>
+            Add
+          </Button>
+        </div>
+        {currentFilters.location && (
+          <div className="mt-2">
+            <Badge variant="secondary" className="gap-1">
+              {currentFilters.location}
+              <X
+                className="h-3 w-3 cursor-pointer"
+                onClick={clearLocation}
+              />
+            </Badge>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default JobFilters;
