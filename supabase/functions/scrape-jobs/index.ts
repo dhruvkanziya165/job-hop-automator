@@ -21,6 +21,7 @@ const JOB_BOARDS: Record<string, string> = {
   internshala: "https://internshala.com/internships/",
   remoteok: "https://remoteok.com/",
   wellfound: "https://wellfound.com/jobs",
+  linkedin: "https://www.linkedin.com/jobs/search/",
 };
 
 serve(async (req) => {
@@ -81,9 +82,13 @@ serve(async (req) => {
         let searchUrl = boardUrl;
         if (keywords && keywords.length > 0) {
           const keywordQuery = keywords.join("+");
-          searchUrl = boardName === "internshala" 
-            ? `${boardUrl}keywords-${keywordQuery}/`
-            : `${boardUrl}?q=${keywordQuery}`;
+          if (boardName === "internshala") {
+            searchUrl = `${boardUrl}keywords-${keywordQuery}/`;
+          } else if (boardName === "linkedin") {
+            searchUrl = `${boardUrl}?keywords=${keywordQuery}&f_TPR=r86400`;
+          } else {
+            searchUrl = `${boardUrl}?q=${keywordQuery}`;
+          }
         }
 
         // Use Firecrawl API to scrape
@@ -143,7 +148,8 @@ serve(async (req) => {
             url: job.url,
             source: job.url.includes("internshala") ? "Internshala" : 
                    job.url.includes("remoteok") ? "RemoteOK" : 
-                   job.url.includes("wellfound") ? "Wellfound" : "Other",
+                   job.url.includes("wellfound") ? "Wellfound" :
+                   job.url.includes("linkedin") ? "LinkedIn" : "Other",
             salary_range: job.salary_range,
             external_id: `${job.company}-${job.title}-${Date.now()}`.replace(/\s+/g, "-").toLowerCase(),
             posted_date: job.posted_date,
