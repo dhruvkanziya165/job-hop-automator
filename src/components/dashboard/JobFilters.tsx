@@ -1,12 +1,13 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, Briefcase, X } from "lucide-react";
+import { Slider } from "@/components/ui/slider";
+import { MapPin, Briefcase, X, DollarSign } from "lucide-react";
 import { useState } from "react";
 
 interface JobFiltersProps {
-  onFilterChange: (filters: { location?: string; jobType?: string }) => void;
-  currentFilters: { location?: string; jobType?: string };
+  onFilterChange: (filters: { location?: string; jobType?: string; salaryMin?: number; salaryMax?: number }) => void;
+  currentFilters: { location?: string; jobType?: string; salaryMin?: number; salaryMax?: number };
 }
 
 const JobFilters = ({ onFilterChange, currentFilters }: JobFiltersProps) => {
@@ -25,6 +26,22 @@ const JobFilters = ({ onFilterChange, currentFilters }: JobFiltersProps) => {
 
   const clearLocation = () => {
     onFilterChange({ ...currentFilters, location: undefined });
+  };
+
+  const handleSalaryChange = (values: number[]) => {
+    onFilterChange({ 
+      ...currentFilters, 
+      salaryMin: values[0] * 1000, 
+      salaryMax: values[1] * 1000 
+    });
+  };
+
+  const clearSalaryFilter = () => {
+    onFilterChange({ 
+      ...currentFilters, 
+      salaryMin: undefined, 
+      salaryMax: undefined 
+    });
   };
 
   return (
@@ -90,6 +107,41 @@ const JobFilters = ({ onFilterChange, currentFilters }: JobFiltersProps) => {
             </Badge>
           </div>
         )}
+      </div>
+
+      {/* Salary Range Filter */}
+      <div>
+        <label className="text-sm font-medium mb-2 block flex items-center gap-2">
+          <DollarSign className="h-4 w-4" />
+          Salary Range (in thousands)
+        </label>
+        <div className="space-y-3">
+          <Slider
+            min={0}
+            max={200}
+            step={5}
+            value={[
+              (currentFilters.salaryMin || 0) / 1000,
+              (currentFilters.salaryMax || 200000) / 1000
+            ]}
+            onValueChange={handleSalaryChange}
+            className="w-full"
+          />
+          <div className="flex items-center justify-between text-sm text-muted-foreground">
+            <span>${((currentFilters.salaryMin || 0) / 1000).toFixed(0)}k</span>
+            <span>${((currentFilters.salaryMax || 200000) / 1000).toFixed(0)}k</span>
+          </div>
+          {(currentFilters.salaryMin !== undefined || currentFilters.salaryMax !== undefined) && (
+            <Button 
+              size="sm" 
+              variant="outline" 
+              onClick={clearSalaryFilter}
+              className="w-full"
+            >
+              Clear Salary Filter
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );
