@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.automate-applications]
 verify_jwt = false
+
+[functions.daily-job-scrape]
+verify_jwt = false

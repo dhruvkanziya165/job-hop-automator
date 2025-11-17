@@ -58,7 +58,7 @@ const JobListings = () => {
     
     const { data, error } = await query
       .order("fetched_at", { ascending: false })
-      .limit(50);
+      .limit(1000); // Show up to 1000 jobs
 
     if (error) {
       toast.error("Failed to fetch jobs");
