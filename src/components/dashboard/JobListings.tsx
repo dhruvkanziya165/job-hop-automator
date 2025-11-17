@@ -155,13 +155,21 @@ const JobListings = () => {
 
   if (filteredJobs.length === 0 && !loading) {
     return (
-      <Card className="p-8 text-center">
-        <Briefcase className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-        <h3 className="text-lg font-semibold mb-2">No jobs found yet</h3>
-        <p className="text-muted-foreground mb-4">
-          Our automation agent will start finding matching jobs based on your preferences
-        </p>
-      </Card>
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold">Matched Jobs</h2>
+        </div>
+        
+        <JobFilters onFilterChange={setFilters} currentFilters={filters} />
+        
+        <Card className="p-8 text-center">
+          <Briefcase className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+          <h3 className="text-lg font-semibold mb-2">No jobs found</h3>
+          <p className="text-muted-foreground mb-4">
+            Try adjusting your filters or click "Scrape 100+ Jobs Now" to find new opportunities
+          </p>
+        </Card>
+      </div>
     );
   }
 
@@ -178,44 +186,47 @@ const JobListings = () => {
           <Card key={job.id} className="p-6 shadow-card hover:shadow-hover transition-all">
             <div className="space-y-4">
               <div className="flex items-start justify-between gap-4">
-                <div className="flex-1">
-                  <h3 className="text-xl font-semibold mb-2">{job.title}</h3>
-                  <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <Building2 className="h-4 w-4" />
-                      {job.company}
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-xl font-semibold mb-2 truncate">{job.title}</h3>
+                  <div className="flex flex-wrap items-center gap-3 text-sm">
+                    <span className="flex items-center gap-1 font-medium text-foreground">
+                      <Building2 className="h-4 w-4 shrink-0" />
+                      <span className="truncate">{job.company}</span>
                     </span>
                     {job.location && (
-                      <span className="flex items-center gap-1">
-                        <MapPin className="h-4 w-4" />
-                        {job.location}
+                      <span className="flex items-center gap-1 text-muted-foreground">
+                        <MapPin className="h-4 w-4 shrink-0" />
+                        <span className="truncate">{job.location}</span>
                       </span>
                     )}
                     {job.salary_range && (
-                      <span className="flex items-center gap-1">
-                        <DollarSign className="h-4 w-4" />
-                        {job.salary_range}
+                      <span className="flex items-center gap-1 text-green-600 dark:text-green-400 font-medium">
+                        <DollarSign className="h-4 w-4 shrink-0" />
+                        <span className="truncate">{job.salary_range}</span>
                       </span>
                     )}
                   </div>
                 </div>
                 <div className="flex gap-2 shrink-0">
-                  <Badge variant="secondary">
+                  <Badge variant="secondary" className="whitespace-nowrap">
                     {job.source}
                   </Badge>
-                  <Badge variant="outline">
-                    {job.job_type === "internship" ? "Internship" : "Job"}
+                  <Badge 
+                    variant="outline"
+                    className={job.job_type === "internship" ? "border-blue-500 text-blue-600 dark:text-blue-400" : ""}
+                  >
+                    {job.job_type === "internship" ? "Internship" : "Full-time"}
                   </Badge>
                 </div>
               </div>
 
-              {job.description && (
-                <p className="text-sm text-muted-foreground line-clamp-2">
+              {job.description && job.description.length > 20 && (
+                <p className="text-sm text-muted-foreground line-clamp-3 leading-relaxed">
                   {job.description}
                 </p>
               )}
 
-              <div className="flex items-center justify-between gap-4 pt-2">
+              <div className="flex items-center justify-between gap-4 pt-2 border-t">
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <Clock className="h-3 w-3" />
                   Posted {new Date(job.posted_date).toLocaleDateString()}
@@ -223,7 +234,7 @@ const JobListings = () => {
                 <div className="flex gap-2">
                   <Button
                     size="sm"
-                    className="bg-gradient-primary flex-1"
+                    className="bg-gradient-primary"
                     onClick={() => {
                       window.open(job.url, "_blank");
                       handleApply(job.id);

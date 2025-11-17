@@ -92,34 +92,44 @@ serve(async (req) => {
           params.push(`location=${encodeURIComponent(location)}`);
         }
         
-        // Build URL based on board
+        // Build URL based on board with better filtering
         if (boardName === "internshala") {
           let internshalaUrl = boardUrl;
           if (keywords && keywords.length > 0) {
-            internshalaUrl += `keywords-${keywords.join("-")}/`;
+            // Use first keyword as main search term for better results
+            internshalaUrl += `${keywords[0].toLowerCase().replace(/\s+/g, "-")}-`;
           }
           if (location && location !== "any") {
             internshalaUrl += `location-${location.toLowerCase().replace(/\s+/g, "-")}/`;
+          } else {
+            internshalaUrl += "internship/";
           }
           searchUrl = internshalaUrl;
         } else if (boardName === "linkedin") {
-          const linkedinParams = [`f_TPR=r86400`];
+          const linkedinParams = [`f_TPR=r86400`]; // Jobs from last 24 hours
           if (keywords && keywords.length > 0) {
-            linkedinParams.push(`keywords=${keywords.join("+")}`);
+            // Use space-separated keywords for better search
+            linkedinParams.push(`keywords=${encodeURIComponent(keywords.join(" "))}`);
           }
           if (location && location !== "any") {
             linkedinParams.push(`location=${encodeURIComponent(location)}`);
           }
+          // Add job type filter
           if (jobType === "internship") {
             linkedinParams.push(`f_JT=I`);
           } else if (jobType === "job") {
             linkedinParams.push(`f_JT=F`);
           }
+          // Add experience level for better matches
+          linkedinParams.push(`f_E=2`); // Entry level and associate
           searchUrl = `${boardUrl}?${linkedinParams.join("&")}`;
         } else {
-          // RemoteOK and Wellfound
-          if (params.length > 0) {
+          // RemoteOK and Wellfound - add keyword filters
+          if (keywords && keywords.length > 0 && params.length > 0) {
             searchUrl = `${boardUrl}?${params.join("&")}`;
+          } else if (keywords && keywords.length > 0) {
+            // For RemoteOK, add skill-based filtering
+            searchUrl = `${boardUrl}/${keywords[0].toLowerCase()}`;
           }
         }
 
@@ -284,19 +294,47 @@ function parseJobsFromContent(content: string, source: string, baseUrl: string, 
   const sections = content.split(/\n\n+/);
   
   for (const section of sections) {
-    // Look for job title patterns
+    // Skip sections that are navigation or footer content
+    if (section.toLowerCase().includes('click here') || 
+        section.toLowerCase().includes('create your account') ||
+        section.toLowerCase().includes('register') ||
+        section.length < 50) {
+      continue;
+    }
+    
+    // Enhanced patterns for better extraction
     const titleMatch = section.match(/^#+\s*(.+?)(?:\n|$)/m) || 
-                      section.match(/^(.+?(?:Engineer|Developer|Intern|Manager|Analyst|Designer).+?)$/m);
+                      section.match(/^[*_]*(.+?(?:Engineer|Developer|Intern|Manager|Analyst|Designer|Architect|Specialist|Lead).+?)[*_]*$/m);
     
-    const companyMatch = section.match(/(?:Company|at|@)\s*[:\-]?\s*([A-Z][A-Za-z\s&\.,']+?)(?:\n|$)/i);
-    const locationMatch = section.match(/(?:Location|Remote|Hybrid|Office)\s*[:\-]?\s*([A-Za-z\s,]+?)(?:\n|$)/i);
-    const salaryMatch = section.match(/(?:\$|₹|€)[\d,k\-\s]+(?:\/year|per year|\/month)?/i);
-    const urlMatch = section.match(/(https?:\/\/[^\s\)]+)/);
+    // Better company extraction
+    const companyMatch = section.match(/(?:Company|at|@|by)\s*[:\-]?\s*([A-Z][A-Za-z\s&\.\-,']{2,50})(?:\n|\||$)/i) ||
+                        section.match(/([A-Z][A-Za-z\s&\.]{2,30})\s*(?:is hiring|seeks|looking for)/i);
     
-    // Only create job posting if we have at least a title and company or URL
-    if (titleMatch && (companyMatch || urlMatch)) {
-      const title = titleMatch[1].trim().toLowerCase();
-      const isInternship = title.includes("intern") || source === "internshala";
+    // Better location extraction
+    const locationMatch = section.match(/(?:Location|Based in|Office|Work from)\s*[:\-]?\s*([A-Za-z\s,\-]+?)(?:\n|\||$)/i) ||
+                         section.match(/\b(Remote|Hybrid|On-?site|WFH|Work from Home)\b/i) ||
+                         section.match(/\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*,\s*[A-Z]{2,})\b/);
+    
+    // Better salary extraction  
+    const salaryMatch = section.match(/(?:Salary|Compensation|Pay|CTC|Stipend)\s*[:\-]?\s*([\d,k₹\$€£\-\s\/]+(?:per year|per month|\/yr|\/mo|LPA|PA)?)/i) ||
+                       section.match(/([\$₹€£][\d,k\-\s]+(?:per year|per month|\/yr|\/mo|LPA|PA)?)/i);
+    
+    // Extract URL from section
+    const urlMatch = section.match(/(https?:\/\/[^\s\)\]]+)/);
+    
+    // Better description extraction
+    let description = section
+      .replace(/https?:\/\/[^\s]+/g, '') // Remove URLs
+      .replace(/^#+\s*/gm, '') // Remove markdown headers
+      .slice(0, 300)
+      .trim();
+    
+    // Only create job posting if we have meaningful data
+    if (titleMatch && titleMatch[1].length > 10 && !titleMatch[1].toLowerCase().includes('looking to')) {
+      const title = titleMatch[1].trim();
+      const isInternship = title.toLowerCase().includes("intern") || 
+                          source === "internshala" ||
+                          description.toLowerCase().includes("internship");
       
       // Determine job type
       let detectedJobType: string;
@@ -309,17 +347,33 @@ function parseJobsFromContent(content: string, source: string, baseUrl: string, 
       // Filter by requested job type
       if (requestedJobType && requestedJobType !== "both") {
         if (requestedJobType !== detectedJobType) {
-          continue; // Skip this job if it doesn't match the requested type
+          continue;
         }
       }
       
+      // Extract better company name or use source as fallback
+      let companyName = "Various Companies";
+      if (companyMatch && companyMatch[1].trim().length > 2) {
+        companyName = companyMatch[1].trim();
+      } else if (source === "internshala") {
+        companyName = "Internshala Partner";
+      } else if (source === "linkedin") {
+        companyName = "LinkedIn Company";
+      }
+      
+      // Better location handling
+      let location = "Remote";
+      if (locationMatch) {
+        location = locationMatch[1].trim();
+      }
+      
       jobs.push({
-        title: titleMatch[1].trim(),
-        company: companyMatch ? companyMatch[1].trim() : "Unknown Company",
-        location: locationMatch ? locationMatch[1].trim() : "Remote",
-        description: section.slice(0, 500).trim(),
+        title: title,
+        company: companyName,
+        location: location,
+        description: description,
         url: urlMatch ? urlMatch[1] : baseUrl,
-        salary_range: salaryMatch ? salaryMatch[0].trim() : undefined,
+        salary_range: salaryMatch ? salaryMatch[1].trim() : undefined,
         posted_date: new Date().toISOString(),
         job_type: detectedJobType,
       });
