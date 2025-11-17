@@ -53,6 +53,8 @@ export const AutomationControls = () => {
         .eq("user_id", user.id)
         .single();
 
+      toast.info("Starting job scraping... This may take a few minutes to crawl multiple pages.");
+
       const { data, error } = await supabase.functions.invoke("scrape-jobs", {
         body: {
           source: "all",
@@ -64,7 +66,7 @@ export const AutomationControls = () => {
 
       if (error) throw error;
 
-      toast.success(`Found ${data.jobsFound} jobs, added ${data.jobsInserted} new ones`);
+      toast.success(`🎉 Found ${data.jobsFound} total listings! Added ${data.jobsInserted} new jobs to your feed.`);
     } catch (error) {
       console.error("Error scraping jobs:", error);
       toast.error("Failed to scrape jobs");
@@ -148,7 +150,7 @@ export const AutomationControls = () => {
         <CardHeader>
           <CardTitle>Quick Actions</CardTitle>
           <CardDescription>
-            Manually trigger automation tasks
+            Scrape 100+ jobs daily from LinkedIn, Internshala, RemoteOK & Wellfound
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -159,12 +161,20 @@ export const AutomationControls = () => {
             disabled={isScraping}
           >
             {isScraping ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Crawling Multiple Pages...
+              </>
             ) : (
-              <RefreshCw className="mr-2 h-4 w-4" />
+              <>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Scrape 100+ Jobs Now
+              </>
             )}
-            Scrape New Jobs
           </Button>
+          <p className="text-xs text-muted-foreground">
+            Crawls up to 100 pages per platform to discover 500+ jobs & 100+ internships
+          </p>
 
           <Button
             onClick={handleRunAutomation}

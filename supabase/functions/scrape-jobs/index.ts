@@ -123,8 +123,8 @@ serve(async (req) => {
           }
         }
 
-        // Use Firecrawl API to scrape
-        const scrapeResponse = await fetch("https://api.firecrawl.dev/v1/scrape", {
+        // Use Firecrawl API to crawl (with pagination for more results)
+        const crawlResponse = await fetch("https://api.firecrawl.dev/v1/crawl", {
           method: "POST",
           headers: {
             "Authorization": `Bearer ${firecrawlApiKey}`,
@@ -132,70 +132,122 @@ serve(async (req) => {
           },
           body: JSON.stringify({
             url: searchUrl,
-            formats: ["markdown"],
+            limit: 100, // Crawl up to 100 pages per board
+            scrapeOptions: {
+              formats: ["markdown"],
+            },
           }),
         });
 
-        if (!scrapeResponse.ok) {
-          console.error(`Firecrawl API error for ${boardName}:`, scrapeResponse.status);
-          const errorText = await scrapeResponse.text();
+        if (!crawlResponse.ok) {
+          console.error(`Firecrawl API error for ${boardName}:`, crawlResponse.status);
+          const errorText = await crawlResponse.text();
           console.error("Error details:", errorText);
           continue;
         }
 
-        const scrapeData = await scrapeResponse.json();
+        const crawlData = await crawlResponse.json();
         
-        if (!scrapeData.success || !scrapeData.data) {
-          console.error(`Failed to scrape ${boardName}`);
+        if (!crawlData.success) {
+          console.error(`Failed to start crawl for ${boardName}`);
           continue;
         }
 
-        // Parse jobs from the scraped content
-        const jobs = parseJobsFromContent(
-          scrapeData.data.markdown || "", 
-          boardName, 
-          boardUrl,
-          jobType
-        );
-        allJobs = allJobs.concat(jobs);
+        // Poll for crawl completion
+        const crawlId = crawlData.id;
+        let crawlComplete = false;
+        let attempts = 0;
+        let crawlResults;
+
+        while (!crawlComplete && attempts < 30) {
+          await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+          
+          const statusResponse = await fetch(`https://api.firecrawl.dev/v1/crawl/${crawlId}`, {
+            headers: {
+              "Authorization": `Bearer ${firecrawlApiKey}`,
+            },
+          });
+
+          if (statusResponse.ok) {
+            crawlResults = await statusResponse.json();
+            if (crawlResults.status === "completed") {
+              crawlComplete = true;
+            } else if (crawlResults.status === "failed") {
+              console.error(`Crawl failed for ${boardName}`);
+              break;
+            }
+          }
+          attempts++;
+        }
+
+        if (!crawlComplete || !crawlResults?.data) {
+          console.error(`Crawl timeout or failed for ${boardName}`);
+          continue;
+        }
+
+        // Parse jobs from all crawled pages
+        console.log(`Processing ${crawlResults.data.length} pages from ${boardName}`);
+        for (const page of crawlResults.data) {
+          const jobs = parseJobsFromContent(
+            page.markdown || "", 
+            boardName, 
+            page.url || boardUrl,
+            jobType
+          );
+          allJobs = allJobs.concat(jobs);
+        }
         
-        console.log(`Found ${jobs.length} jobs from ${boardName}`);
+        console.log(`Found ${allJobs.length} total jobs so far from ${boardName}`);
       } catch (error) {
         console.error(`Error scraping ${boardName}:`, error);
       }
     }
 
-    console.log(`Total jobs found: ${allJobs.length}`);
+    console.log(`Total jobs found before deduplication: ${allJobs.length}`);
 
-    // Insert jobs into database
-    let insertedCount = 0;
+    // Deduplicate jobs by title + company
+    const uniqueJobs = new Map();
     for (const job of allJobs) {
-      const { error } = await supabase
+      const key = `${job.company.toLowerCase()}-${job.title.toLowerCase()}`;
+      if (!uniqueJobs.has(key)) {
+        uniqueJobs.set(key, job);
+      }
+    }
+    
+    const deduplicatedJobs = Array.from(uniqueJobs.values());
+    console.log(`Total unique jobs after deduplication: ${deduplicatedJobs.length}`);
+
+    // Insert jobs into database in batches
+    let insertedCount = 0;
+    const batchSize = 50;
+    
+    for (let i = 0; i < deduplicatedJobs.length; i += batchSize) {
+      const batch = deduplicatedJobs.slice(i, i + batchSize);
+      const jobsToInsert = batch.map(job => ({
+        title: job.title,
+        company: job.company,
+        location: job.location || "Not specified",
+        description: job.description,
+        url: job.url,
+        source: job.url.includes("internshala") ? "Internshala" : 
+               job.url.includes("remoteok") ? "RemoteOK" : 
+               job.url.includes("wellfound") ? "Wellfound" :
+               job.url.includes("linkedin") ? "LinkedIn" : "Other",
+        salary_range: job.salary_range,
+        job_type: job.job_type || "job",
+        external_id: `${job.company}-${job.title}`.replace(/\s+/g, "-").toLowerCase(),
+        posted_date: job.posted_date,
+        fetched_at: new Date().toISOString(),
+      }));
+
+      const { data, error } = await supabase
         .from("job_postings")
-        .upsert(
-          {
-            title: job.title,
-            company: job.company,
-            location: job.location || "Not specified",
-            description: job.description,
-            url: job.url,
-            source: job.url.includes("internshala") ? "Internshala" : 
-                   job.url.includes("remoteok") ? "RemoteOK" : 
-                   job.url.includes("wellfound") ? "Wellfound" :
-                   job.url.includes("linkedin") ? "LinkedIn" : "Other",
-            salary_range: job.salary_range,
-            job_type: job.job_type || "job",
-            external_id: `${job.company}-${job.title}-${Date.now()}`.replace(/\s+/g, "-").toLowerCase(),
-            posted_date: job.posted_date,
-            fetched_at: new Date().toISOString(),
-          },
-          { onConflict: "external_id" }
-        );
+        .upsert(jobsToInsert, { onConflict: "external_id", ignoreDuplicates: true });
 
       if (error) {
-        console.error("Error inserting job:", error);
+        console.error("Error inserting batch:", error);
       } else {
-        insertedCount++;
+        insertedCount += jobsToInsert.length;
       }
     }
 
