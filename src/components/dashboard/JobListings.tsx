@@ -29,12 +29,17 @@ interface Job {
 
 const JobListings = () => {
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [filteredJobs, setFilteredJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState<{ location?: string; jobType?: string }>({ jobType: "both" });
+  const [filters, setFilters] = useState<{ location?: string; jobType?: string; salaryMin?: number; salaryMax?: number }>({ jobType: "both" });
 
   useEffect(() => {
     fetchJobs();
-  }, [filters]);
+  }, [filters.location, filters.jobType]);
+
+  useEffect(() => {
+    filterJobsBySalary();
+  }, [jobs, filters.salaryMin, filters.salaryMax]);
 
   const fetchJobs = async () => {
     let query = supabase
@@ -62,6 +67,57 @@ const JobListings = () => {
 
     setJobs(data || []);
     setLoading(false);
+  };
+
+  const parseSalaryRange = (salaryRange: string | null): { min: number; max: number } | null => {
+    if (!salaryRange) return null;
+    
+    // Extract numbers from salary range text
+    const numbers = salaryRange.match(/\d+/g);
+    if (!numbers || numbers.length === 0) return null;
+    
+    const values = numbers.map(n => parseInt(n));
+    
+    // Handle different formats
+    if (salaryRange.toLowerCase().includes('lpa') || salaryRange.toLowerCase().includes('lakh')) {
+      // Indian format (lakhs per annum) - convert to thousands
+      return {
+        min: values[0] * 100, // 1 lakh = 100k
+        max: values.length > 1 ? values[1] * 100 : values[0] * 100
+      };
+    } else if (salaryRange.includes('k') || salaryRange.includes('K')) {
+      // Already in thousands
+      return {
+        min: values[0],
+        max: values.length > 1 ? values[1] : values[0]
+      };
+    } else {
+      // Assume it's in thousands if no unit specified
+      return {
+        min: values[0],
+        max: values.length > 1 ? values[1] : values[0]
+      };
+    }
+  };
+
+  const filterJobsBySalary = () => {
+    if (filters.salaryMin === undefined && filters.salaryMax === undefined) {
+      setFilteredJobs(jobs);
+      return;
+    }
+
+    const filtered = jobs.filter(job => {
+      const salaryRange = parseSalaryRange(job.salary_range);
+      if (!salaryRange) return true; // Include jobs without salary info
+      
+      const filterMin = filters.salaryMin || 0;
+      const filterMax = filters.salaryMax || Infinity;
+      
+      // Job matches if its salary range overlaps with filter range
+      return salaryRange.max >= filterMin && salaryRange.min <= filterMax;
+    });
+
+    setFilteredJobs(filtered);
   };
 
   const handleApply = async (jobId: string) => {
@@ -97,7 +153,7 @@ const JobListings = () => {
     );
   }
 
-  if (jobs.length === 0) {
+  if (filteredJobs.length === 0 && !loading) {
     return (
       <Card className="p-8 text-center">
         <Briefcase className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
@@ -118,7 +174,7 @@ const JobListings = () => {
       <JobFilters onFilterChange={setFilters} currentFilters={filters} />
 
       <div className="grid gap-4">
-        {jobs.map((job) => (
+        {filteredJobs.map((job) => (
           <Card key={job.id} className="p-6 shadow-card hover:shadow-hover transition-all">
             <div className="space-y-4">
               <div className="flex items-start justify-between gap-4">
