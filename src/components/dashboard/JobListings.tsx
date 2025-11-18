@@ -9,10 +9,20 @@ import {
   DollarSign, 
   ExternalLink,
   Clock,
-  Briefcase
+  Briefcase,
+  Star
 } from "lucide-react";
 import { toast } from "sonner";
 import JobFilters from "./JobFilters";
+
+// Helper function to clean markdown links and extract text
+const cleanMarkdownText = (text: string): string => {
+  if (!text) return "";
+  // Remove markdown links [text](url) and keep only text
+  return text.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/[#*_]/g, '') // Remove other markdown symbols
+    .trim();
+};
 
 interface Job {
   id: string;
@@ -187,73 +197,112 @@ const JobListings = () => {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">Matched Jobs</h2>
+        <div>
+          <h2 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+            Matched Jobs
+          </h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            {filteredJobs.length} opportunities found
+          </p>
+        </div>
       </div>
       
       <JobFilters onFilterChange={setFilters} currentFilters={filters} />
 
       <div className="grid gap-4">
-        {filteredJobs.map((job) => (
-          <Card key={job.id} className="p-6 shadow-card hover:shadow-hover transition-all">
-            <div className="space-y-4">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-xl font-semibold mb-2 truncate">{job.title}</h3>
-                  <div className="flex flex-wrap items-center gap-3 text-sm">
-                    <span className="flex items-center gap-1 font-medium text-foreground">
-                      <Building2 className="h-4 w-4 shrink-0" />
-                      <span className="truncate">{job.company}</span>
-                    </span>
-                    {job.location && (
-                      <span className="flex items-center gap-1 text-muted-foreground">
-                        <MapPin className="h-4 w-4 shrink-0" />
-                        <span className="truncate">{job.location}</span>
-                      </span>
-                    )}
-                    {job.salary_range && (
-                      <span className="flex items-center gap-1 text-green-600 dark:text-green-400 font-medium">
-                        <DollarSign className="h-4 w-4 shrink-0" />
-                        <span className="truncate">
-                          {job.salary_range.includes('$') || job.salary_range.includes('USD') 
-                            ? `₹${job.salary_range.replace(/\$/g, '').replace('USD', '')} (approx)` 
-                            : job.salary_range.includes('lpa') || job.salary_range.includes('LPA')
-                            ? job.salary_range
-                            : `₹${job.salary_range}`}
-                        </span>
-                      </span>
-                    )}
+        {filteredJobs.map((job) => {
+          const cleanTitle = cleanMarkdownText(job.title);
+          const cleanDescription = cleanMarkdownText(job.description || "");
+          const cleanCompany = cleanMarkdownText(job.company);
+          
+          return (
+            <Card 
+              key={job.id} 
+              className="group relative overflow-hidden border-2 hover:border-primary/50 transition-all duration-300 hover:shadow-xl bg-gradient-to-br from-background to-background/50"
+            >
+              <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-primary/10 to-transparent rounded-bl-full opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              
+              <div className="relative p-6 space-y-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0 space-y-3">
+                    <div className="flex items-start gap-3">
+                      <div className="mt-1 p-2 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                        <Briefcase className="h-5 w-5 text-primary" />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="text-xl font-bold mb-2 text-foreground group-hover:text-primary transition-colors line-clamp-2">
+                          {cleanTitle}
+                        </h3>
+                        <div className="flex flex-wrap items-center gap-3 text-sm">
+                          <span className="flex items-center gap-1.5 font-semibold text-foreground bg-secondary/50 px-3 py-1 rounded-full">
+                            <Building2 className="h-4 w-4 shrink-0" />
+                            <span className="truncate">{cleanCompany}</span>
+                          </span>
+                          {job.location && (
+                            <span className="flex items-center gap-1.5 text-muted-foreground bg-muted/50 px-3 py-1 rounded-full">
+                              <MapPin className="h-4 w-4 shrink-0" />
+                              <span className="truncate">{job.location}</span>
+                            </span>
+                          )}
+                          {job.salary_range && (
+                            <span className="flex items-center gap-1.5 text-green-600 dark:text-green-400 font-semibold bg-green-50 dark:bg-green-950/30 px-3 py-1 rounded-full">
+                              <DollarSign className="h-4 w-4 shrink-0" />
+                              <span className="truncate">
+                                {job.salary_range.includes('$') || job.salary_range.includes('USD') 
+                                  ? `₹${job.salary_range.replace(/\$/g, '').replace('USD', '')} (approx)` 
+                                  : job.salary_range.includes('lpa') || job.salary_range.includes('LPA')
+                                  ? job.salary_range
+                                  : `₹${job.salary_range}`}
+                              </span>
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-2 shrink-0">
+                    <Badge 
+                      variant="secondary" 
+                      className="whitespace-nowrap font-semibold shadow-sm"
+                    >
+                      <Star className="h-3 w-3 mr-1" />
+                      {job.source}
+                    </Badge>
+                    <Badge 
+                      variant={job.job_type === "internship" ? "default" : "outline"}
+                      className={job.job_type === "internship" 
+                        ? "bg-blue-500 hover:bg-blue-600 text-white font-semibold shadow-sm" 
+                        : "border-2 font-semibold"}
+                    >
+                      {job.job_type === "internship" ? "🎓 Internship" : "💼 Full-time"}
+                    </Badge>
                   </div>
                 </div>
-                <div className="flex gap-2 shrink-0">
-                  <Badge variant="secondary" className="whitespace-nowrap">
-                    {job.source}
-                  </Badge>
-                  <Badge 
-                    variant="outline"
-                    className={job.job_type === "internship" ? "border-blue-500 text-blue-600 dark:text-blue-400" : ""}
-                  >
-                    {job.job_type === "internship" ? "Internship" : "Full-time"}
-                  </Badge>
-                </div>
-              </div>
 
-              {job.description && job.description.length > 20 && (
-                <p className="text-sm text-muted-foreground line-clamp-3 leading-relaxed">
-                  {job.description}
-                </p>
-              )}
+                {cleanDescription && cleanDescription.length > 20 && (
+                  <div className="pl-14">
+                    <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
+                      {cleanDescription}
+                    </p>
+                  </div>
+                )}
 
-              <div className="flex items-center justify-between gap-4 pt-2 border-t">
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Clock className="h-3 w-3" />
-                  Posted {new Date(job.posted_date).toLocaleDateString()}
-                </div>
-                <div className="flex gap-2">
+                <div className="flex items-center justify-between gap-4 pt-3 border-t border-border/50">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/30 px-3 py-1.5 rounded-full">
+                    <Clock className="h-3.5 w-3.5" />
+                    <span className="font-medium">
+                      Posted {new Date(job.posted_date).toLocaleDateString('en-US', { 
+                        month: 'short', 
+                        day: 'numeric',
+                        year: 'numeric'
+                      })}
+                    </span>
+                  </div>
                   <Button
                     size="sm"
-                    className="bg-gradient-primary"
+                    className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg hover:shadow-xl transition-all duration-300 font-semibold group-hover:scale-105"
                     onClick={() => {
                       window.open(job.url, "_blank");
                       handleApply(job.id);
@@ -264,9 +313,9 @@ const JobListings = () => {
                   </Button>
                 </div>
               </div>
-            </div>
-          </Card>
-        ))}
+            </Card>
+          );
+        })}
       </div>
     </div>
   );
