@@ -94,16 +94,30 @@ serve(async (req) => {
         
         // Build URL based on board with better filtering
         if (boardName === "internshala") {
-          let internshalaUrl = boardUrl;
+          // Internshala India-focused job board
+          let internshalaUrl = "https://internshala.com/";
+          
+          if (jobType === "internship" || jobType === "both") {
+            internshalaUrl += "internships/";
+          } else {
+            internshalaUrl += "jobs/";
+          }
+          
+          // Add keywords
           if (keywords && keywords.length > 0) {
-            // Use first keyword as main search term for better results
             internshalaUrl += `${keywords[0].toLowerCase().replace(/\s+/g, "-")}-`;
           }
+          
+          // Add location - support India locations
           if (location && location !== "any") {
-            internshalaUrl += `location-${location.toLowerCase().replace(/\s+/g, "-")}/`;
+            const locationSlug = location.toLowerCase()
+              .replace(/\s+/g, "-")
+              .replace(/,/g, "");
+            internshalaUrl += `in-${locationSlug}`;
           } else {
-            internshalaUrl += "internship/";
+            internshalaUrl += "india";
           }
+          
           searchUrl = internshalaUrl;
         } else if (boardName === "linkedin") {
           const linkedinParams = [`f_TPR=r86400`]; // Jobs from last 24 hours
@@ -315,9 +329,10 @@ function parseJobsFromContent(content: string, source: string, baseUrl: string, 
                          section.match(/\b(Remote|Hybrid|On-?site|WFH|Work from Home)\b/i) ||
                          section.match(/\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*,\s*[A-Z]{2,})\b/);
     
-    // Better salary extraction  
-    const salaryMatch = section.match(/(?:Salary|Compensation|Pay|CTC|Stipend)\s*[:\-]?\s*([\d,k₹\$€£\-\s\/]+(?:per year|per month|\/yr|\/mo|LPA|PA)?)/i) ||
-                       section.match(/([\$₹€£][\d,k\-\s]+(?:per year|per month|\/yr|\/mo|LPA|PA)?)/i);
+    // Better salary extraction with INR support
+    const salaryMatch = section.match(/(?:Salary|Compensation|Pay|CTC|Stipend)\s*[:\-]?\s*([\d,k₹\$€£\-\s\/]+(?:per year|per month|\/yr|\/mo|LPA|PA|per annum)?)/i) ||
+                       section.match(/([\$₹€£][\d,k\-\s]+(?:per year|per month|\/yr|\/mo|LPA|PA|per annum)?)/i) ||
+                       section.match(/(\d+[\s\-]+\d+\s*(?:LPA|lpa|Lacs?|lakhs?))/i);
     
     // Extract URL from section
     const urlMatch = section.match(/(https?:\/\/[^\s\)\]]+)/);

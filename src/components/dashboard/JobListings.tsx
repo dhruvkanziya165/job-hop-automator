@@ -85,8 +85,21 @@ const JobListings = () => {
         min: values[0] * 100, // 1 lakh = 100k
         max: values.length > 1 ? values[1] * 100 : values[0] * 100
       };
+    } else if (salaryRange.includes('$') || salaryRange.includes('USD')) {
+      // Convert USD to INR (approximate: 1 USD = 83 INR, then convert to thousands)
+      return {
+        min: Math.round((values[0] * 83) / 1000),
+        max: values.length > 1 ? Math.round((values[1] * 83) / 1000) : Math.round((values[0] * 83) / 1000)
+      };
     } else if (salaryRange.includes('k') || salaryRange.includes('K')) {
-      // Already in thousands
+      // Already in thousands - check if it's USD and convert
+      const isUSD = salaryRange.includes('$');
+      if (isUSD) {
+        return {
+          min: Math.round((values[0] * 1000 * 83) / 1000), // Convert to INR thousands
+          max: values.length > 1 ? Math.round((values[1] * 1000 * 83) / 1000) : Math.round((values[0] * 1000 * 83) / 1000)
+        };
+      }
       return {
         min: values[0],
         max: values.length > 1 ? values[1] : values[0]
@@ -202,7 +215,13 @@ const JobListings = () => {
                     {job.salary_range && (
                       <span className="flex items-center gap-1 text-green-600 dark:text-green-400 font-medium">
                         <DollarSign className="h-4 w-4 shrink-0" />
-                        <span className="truncate">{job.salary_range}</span>
+                        <span className="truncate">
+                          {job.salary_range.includes('$') || job.salary_range.includes('USD') 
+                            ? `₹${job.salary_range.replace(/\$/g, '').replace('USD', '')} (approx)` 
+                            : job.salary_range.includes('lpa') || job.salary_range.includes('LPA')
+                            ? job.salary_range
+                            : `₹${job.salary_range}`}
+                        </span>
                       </span>
                     )}
                   </div>

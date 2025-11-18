@@ -31,8 +31,8 @@ const JobFilters = ({ onFilterChange, currentFilters }: JobFiltersProps) => {
   const handleSalaryChange = (values: number[]) => {
     onFilterChange({ 
       ...currentFilters, 
-      salaryMin: values[0] * 1000, 
-      salaryMax: values[1] * 1000 
+      salaryMin: values[0] * 100, // Convert LPA to thousands (1 LPA = 100k)
+      salaryMax: values[1] * 100 
     });
   };
 
@@ -113,23 +113,23 @@ const JobFilters = ({ onFilterChange, currentFilters }: JobFiltersProps) => {
       <div>
         <label className="text-sm font-medium mb-2 block flex items-center gap-2">
           <DollarSign className="h-4 w-4" />
-          Salary Range (in thousands)
+          Salary Range (₹ LPA)
         </label>
         <div className="space-y-3">
           <Slider
             min={0}
-            max={200}
-            step={5}
+            max={50}
+            step={1}
             value={[
-              (currentFilters.salaryMin || 0) / 1000,
-              (currentFilters.salaryMax || 200000) / 1000
+              (currentFilters.salaryMin || 0) / 100, // Convert to LPA
+              (currentFilters.salaryMax || 5000) / 100
             ]}
             onValueChange={handleSalaryChange}
             className="w-full"
           />
           <div className="flex items-center justify-between text-sm text-muted-foreground">
-            <span>${((currentFilters.salaryMin || 0) / 1000).toFixed(0)}k</span>
-            <span>${((currentFilters.salaryMax || 200000) / 1000).toFixed(0)}k</span>
+            <span>₹{((currentFilters.salaryMin || 0) / 100).toFixed(0)} LPA</span>
+            <span>₹{((currentFilters.salaryMax || 5000) / 100).toFixed(0)} LPA</span>
           </div>
           {(currentFilters.salaryMin !== undefined || currentFilters.salaryMax !== undefined) && (
             <Button 
