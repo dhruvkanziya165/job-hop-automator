@@ -23,6 +23,8 @@ const JOB_BOARDS: Record<string, string> = {
   remoteok: "https://remoteok.com/",
   wellfound: "https://wellfound.com/jobs",
   linkedin: "https://www.linkedin.com/jobs/search/",
+  naukri: "https://www.naukri.com/",
+  fresherworld: "https://www.freshersworld.com/",
 };
 
 serve(async (req) => {
@@ -94,7 +96,12 @@ serve(async (req) => {
         
         // Build URL based on board with better filtering
         if (boardName === "internshala") {
-          // Internshala India-focused job board
+          // Internshala India-focused job board - use multiple category pages
+          const categories = keywords && keywords.length > 0 
+            ? keywords.map((k: string) => k.toLowerCase().replace(/\s+/g, "-"))
+            : ["computer-science", "engineering", "software-development", "web-development", "data-science"];
+          
+          // Build URL with first category
           let internshalaUrl = "https://internshala.com/";
           
           if (jobType === "internship" || jobType === "both") {
@@ -103,12 +110,9 @@ serve(async (req) => {
             internshalaUrl += "jobs/";
           }
           
-          // Add keywords
-          if (keywords && keywords.length > 0) {
-            internshalaUrl += `${keywords[0].toLowerCase().replace(/\s+/g, "-")}-`;
-          }
+          // Add category and location
+          internshalaUrl += `${categories[0]}-`;
           
-          // Add location - support India locations
           if (location && location !== "any") {
             const locationSlug = location.toLowerCase()
               .replace(/\s+/g, "-")
@@ -137,6 +141,16 @@ serve(async (req) => {
           // Add experience level for better matches
           linkedinParams.push(`f_E=2`); // Entry level and associate
           searchUrl = `${boardUrl}?${linkedinParams.join("&")}`;
+        } else if (boardName === "naukri" || boardName === "fresherworld") {
+          // Indian job boards
+          const keywordQuery = keywords && keywords.length > 0 ? keywords.join("-") : "software-developer";
+          const locationQuery = location && location !== "any" ? location.toLowerCase().replace(/\s+/g, "-") : "india";
+          
+          if (boardName === "naukri") {
+            searchUrl = `https://www.naukri.com/${keywordQuery}-jobs-in-${locationQuery}`;
+          } else {
+            searchUrl = `https://www.freshersworld.com/jobs/jobsearch/${keywordQuery}-jobs-in-${locationQuery}`;
+          }
         } else {
           // RemoteOK and Wellfound - add keyword filters
           if (keywords && keywords.length > 0 && params.length > 0) {
@@ -156,9 +170,12 @@ serve(async (req) => {
           },
           body: JSON.stringify({
             url: searchUrl,
-            limit: 100, // Crawl up to 100 pages per board
+            limit: 200, // Increased to 200 pages per board for more jobs
             scrapeOptions: {
               formats: ["markdown"],
+              includePaths: boardName === "internshala" 
+                ? ["internships/*", "jobs/*"]
+                : undefined,
             },
           }),
         });
@@ -256,7 +273,9 @@ serve(async (req) => {
         source: job.url.includes("internshala") ? "Internshala" : 
                job.url.includes("remoteok") ? "RemoteOK" : 
                job.url.includes("wellfound") ? "Wellfound" :
-               job.url.includes("linkedin") ? "LinkedIn" : "Other",
+               job.url.includes("linkedin") ? "LinkedIn" :
+               job.url.includes("naukri") ? "Naukri" :
+               job.url.includes("freshersworld") ? "FreshersWorld" : "Other",
         salary_range: job.salary_range,
         job_type: job.job_type || "job",
         external_id: `${job.company}-${job.title}`.replace(/\s+/g, "-").toLowerCase(),
@@ -316,23 +335,26 @@ function parseJobsFromContent(content: string, source: string, baseUrl: string, 
       continue;
     }
     
-    // Enhanced patterns for better extraction
+    // Enhanced patterns for better extraction - more lenient matching
     const titleMatch = section.match(/^#+\s*(.+?)(?:\n|$)/m) || 
-                      section.match(/^[*_]*(.+?(?:Engineer|Developer|Intern|Manager|Analyst|Designer|Architect|Specialist|Lead).+?)[*_]*$/m);
+                      section.match(/^[*_]*(.+?(?:Engineer|Developer|Intern|Manager|Analyst|Designer|Architect|Specialist|Lead|Executive|Associate|Trainee).+?)[*_]*$/mi) ||
+                      section.match(/\*\*(.+?(?:Engineer|Developer|Intern|Manager|Analyst|Designer|role|position).+?)\*\*/i);
     
-    // Better company extraction
-    const companyMatch = section.match(/(?:Company|at|@|by)\s*[:\-]?\s*([A-Z][A-Za-z\s&\.\-,']{2,50})(?:\n|\||$)/i) ||
-                        section.match(/([A-Z][A-Za-z\s&\.]{2,30})\s*(?:is hiring|seeks|looking for)/i);
+    // Better company extraction - more patterns
+    const companyMatch = section.match(/(?:Company|Organization|at|@|by|with)\s*[:\-]?\s*([A-Z][A-Za-z\s&\.\-,']{2,50})(?:\n|\||$)/i) ||
+                        section.match(/([A-Z][A-Za-z\s&\.]{2,30})\s*(?:is hiring|seeks|looking for|invites)/i) ||
+                        section.match(/\*\*Company\*\*\s*[:\-]?\s*(.+?)(?:\n|$)/i);
     
-    // Better location extraction
-    const locationMatch = section.match(/(?:Location|Based in|Office|Work from)\s*[:\-]?\s*([A-Za-z\s,\-]+?)(?:\n|\||$)/i) ||
-                         section.match(/\b(Remote|Hybrid|On-?site|WFH|Work from Home)\b/i) ||
+    // Better location extraction - include Indian cities
+    const locationMatch = section.match(/(?:Location|Based in|Office|Work from|City)\s*[:\-]?\s*([A-Za-z\s,\-]+?)(?:\n|\||$)/i) ||
+                         section.match(/\b(Remote|Hybrid|On-?site|WFH|Work from Home|Mumbai|Delhi|Bangalore|Hyderabad|Chennai|Pune|Kolkata|Ahmedabad|Surat|Jaipur|Lucknow|Kanpur|Nagpur|Indore|Noida|Gurugram|Gurgaon)\b/i) ||
                          section.match(/\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*,\s*[A-Z]{2,})\b/);
     
-    // Better salary extraction with INR support
-    const salaryMatch = section.match(/(?:Salary|Compensation|Pay|CTC|Stipend)\s*[:\-]?\s*([\d,k₹\$€£\-\s\/]+(?:per year|per month|\/yr|\/mo|LPA|PA|per annum)?)/i) ||
-                       section.match(/([\$₹€£][\d,k\-\s]+(?:per year|per month|\/yr|\/mo|LPA|PA|per annum)?)/i) ||
-                       section.match(/(\d+[\s\-]+\d+\s*(?:LPA|lpa|Lacs?|lakhs?))/i);
+    // Better salary extraction with INR support - more formats
+    const salaryMatch = section.match(/(?:Salary|Compensation|Pay|CTC|Stipend|Package)\s*[:\-]?\s*([\d,k₹\$€£\-\s\/]+(?:per year|per month|\/yr|\/mo|LPA|lpa|PA|per annum|pm|\/month)?)/i) ||
+                       section.match(/([\$₹€£][\d,k\-\s]+(?:per year|per month|\/yr|\/mo|LPA|lpa|PA|per annum)?)/i) ||
+                       section.match(/(\d+[\s\-]+\d+\s*(?:LPA|lpa|Lacs?|lakhs?|k|K))/i) ||
+                       section.match(/\*\*(?:Salary|Stipend|CTC)\*\*\s*[:\-]?\s*(.+?)(?:\n|$)/i);
     
     // Extract URL from section
     const urlMatch = section.match(/(https?:\/\/[^\s\)\]]+)/);
@@ -344,11 +366,12 @@ function parseJobsFromContent(content: string, source: string, baseUrl: string, 
       .slice(0, 300)
       .trim();
     
-    // Only create job posting if we have meaningful data
-    if (titleMatch && titleMatch[1].length > 10 && !titleMatch[1].toLowerCase().includes('looking to')) {
-      const title = titleMatch[1].trim();
+    // Only create job posting if we have meaningful data - more lenient
+    if (titleMatch && titleMatch[1].length > 5 && !titleMatch[1].toLowerCase().includes('looking to')) {
+      const title = titleMatch[1].trim().replace(/\*\*/g, '').replace(/[#]/g, '');
       const isInternship = title.toLowerCase().includes("intern") || 
                           source === "internshala" ||
+                          section.toLowerCase().includes("internship") ||
                           description.toLowerCase().includes("internship");
       
       // Determine job type
@@ -369,11 +392,15 @@ function parseJobsFromContent(content: string, source: string, baseUrl: string, 
       // Extract better company name or use source as fallback
       let companyName = "Various Companies";
       if (companyMatch && companyMatch[1].trim().length > 2) {
-        companyName = companyMatch[1].trim();
+        companyName = companyMatch[1].trim().replace(/\*\*/g, '');
       } else if (source === "internshala") {
         companyName = "Internshala Partner";
       } else if (source === "linkedin") {
         companyName = "LinkedIn Company";
+      } else if (source === "naukri") {
+        companyName = "Naukri Partner";
+      } else if (source === "fresherworld") {
+        companyName = "FreshersWorld Partner";
       }
       
       // Better location handling
