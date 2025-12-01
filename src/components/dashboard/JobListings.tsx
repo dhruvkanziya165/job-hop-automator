@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import JobFilters from "./JobFilters";
+import { CircularProgress } from "./CircularProgress";
+import { JobDetailsModal } from "./JobDetailsModal";
 
 // Helper function to clean markdown links and extract text
 const cleanMarkdownText = (text: string): string => {
@@ -42,6 +44,10 @@ const JobListings = () => {
   const [filteredJobs, setFilteredJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState<{ location?: string; jobType?: string; salaryMin?: number; salaryMax?: number }>({ jobType: "both" });
+  const [matchScores, setMatchScores] = useState<Record<string, { score: number; reasons: string[] }>>({});
+  const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [similarJobs, setSimilarJobs] = useState<Job[]>([]);
 
   useEffect(() => {
     fetchJobs();
@@ -50,6 +56,12 @@ const JobListings = () => {
   useEffect(() => {
     filterJobsBySalary();
   }, [jobs, filters.salaryMin, filters.salaryMax]);
+
+  useEffect(() => {
+    if (filteredJobs.length > 0) {
+      fetchMatchScores();
+    }
+  }, [filteredJobs]);
 
   const fetchJobs = async () => {
     let query = supabase
@@ -143,6 +155,45 @@ const JobListings = () => {
     setFilteredJobs(filtered);
   };
 
+  const fetchMatchScores = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+
+    // Fetch scores for first 10 jobs only to avoid rate limits
+    const jobsToScore = filteredJobs.slice(0, 10);
+    
+    for (const job of jobsToScore) {
+      try {
+        const { data, error } = await supabase.functions.invoke('calculate-job-match', {
+          body: { jobId: job.id }
+        });
+
+        if (!error && data) {
+          setMatchScores(prev => ({ ...prev, [job.id]: data }));
+        }
+      } catch (err) {
+        console.error('Error fetching match score:', err);
+      }
+    }
+  };
+
+  const handleJobClick = (job: Job) => {
+    setSelectedJob(job);
+    
+    // Find similar jobs (same job type, similar location or company)
+    const similar = filteredJobs
+      .filter(j => 
+        j.id !== job.id && 
+        (j.job_type === job.job_type || 
+         j.company.toLowerCase().includes(job.company.toLowerCase().split(' ')[0]) ||
+         j.location?.toLowerCase().includes(job.location?.toLowerCase().split(',')[0] || ''))
+      )
+      .slice(0, 5);
+    
+    setSimilarJobs(similar);
+    setModalOpen(true);
+  };
+
   const handleApply = async (jobId: string) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
@@ -216,16 +267,23 @@ const JobListings = () => {
           const cleanTitle = cleanMarkdownText(job.title);
           const cleanDescription = cleanMarkdownText(job.description || "");
           const cleanCompany = cleanMarkdownText(job.company);
+          const matchScore = matchScores[job.id];
           
           return (
             <Card 
               key={job.id} 
-              className="group relative overflow-hidden border-2 hover:border-primary/50 transition-all duration-300 hover:shadow-xl bg-gradient-to-br from-background to-background/50"
+              className="group relative overflow-hidden border-2 hover:border-primary/50 transition-all duration-300 hover:shadow-xl bg-gradient-to-br from-background to-background/50 cursor-pointer"
+              onClick={() => handleJobClick(job)}
             >
               <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-primary/10 to-transparent rounded-bl-full opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
               
               <div className="relative p-6 space-y-4">
                 <div className="flex items-start justify-between gap-4">
+                  {matchScore && (
+                    <div className="shrink-0">
+                      <CircularProgress value={matchScore.score} size={70} />
+                    </div>
+                  )}
                   <div className="flex-1 min-w-0 space-y-3">
                     <div className="flex items-start gap-3">
                       <div className="mt-1 p-2 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
@@ -303,7 +361,8 @@ const JobListings = () => {
                   <Button
                     size="sm"
                     className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg hover:shadow-xl transition-all duration-300 font-semibold group-hover:scale-105"
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       window.open(job.url, "_blank");
                       handleApply(job.id);
                     }}
@@ -317,6 +376,16 @@ const JobListings = () => {
           );
         })}
       </div>
+
+      <JobDetailsModal
+        job={selectedJob}
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        matchScore={selectedJob ? matchScores[selectedJob.id] : undefined}
+        similarJobs={similarJobs}
+        onApply={handleApply}
+        onJobSelect={handleJobClick}
+      />
     </div>
   );
 };
