@@ -339,6 +339,16 @@ function parseJobsFromContent(content: string, source: string, baseUrl: string, 
       continue;
     }
     
+    // Helper to clean markdown and formatting
+    const cleanText = (text: string): string => {
+      if (!text) return "";
+      return text
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // Remove markdown links
+        .replace(/[#*_`]/g, '') // Remove markdown symbols
+        .replace(/\s+/g, ' ') // Normalize whitespace
+        .trim();
+    };
+
     // Enhanced patterns for better extraction - more lenient matching with more roles
     const titleMatch = section.match(/^#+\s*(.+?)(?:\n|$)/m) || 
                       section.match(/^[*_]*(.+?(?:Engineer|Developer|Intern|Manager|Analyst|Designer|Architect|Specialist|Lead|Executive|Associate|Trainee|Consultant|Coordinator|Officer|Assistant|Graduate|Fresher|Entry|Junior|Senior|Full Stack|Frontend|Backend|Data|Software|Web|Mobile|Cloud|DevOps|QA|Testing|Marketing|Sales|HR|Finance|Operations).+?)[*_]*$/mi) ||
@@ -366,16 +376,19 @@ function parseJobsFromContent(content: string, source: string, baseUrl: string, 
     // Extract URL from section
     const urlMatch = section.match(/(https?:\/\/[^\s\)\]]+)/);
     
-    // Better description extraction
+    // Better description extraction - get more context
     let description = section
       .replace(/https?:\/\/[^\s]+/g, '') // Remove URLs
       .replace(/^#+\s*/gm, '') // Remove markdown headers
-      .slice(0, 300)
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // Remove markdown links
+      .replace(/[*_`]/g, '') // Remove markdown formatting
+      .replace(/\s+/g, ' ') // Normalize whitespace
+      .slice(0, 500) // Increase description length
       .trim();
     
     // Only create job posting if we have meaningful data - more lenient
     if (titleMatch && titleMatch[1].length > 5 && !titleMatch[1].toLowerCase().includes('looking to')) {
-      const title = titleMatch[1].trim().replace(/\*\*/g, '').replace(/[#]/g, '');
+      const title = cleanText(titleMatch[1]);
       const isInternship = title.toLowerCase().includes("intern") || 
                           source === "internshala" ||
                           section.toLowerCase().includes("internship") ||
@@ -399,7 +412,7 @@ function parseJobsFromContent(content: string, source: string, baseUrl: string, 
       // Extract better company name or use source as fallback
       let companyName = "Various Companies";
       if (companyMatch && companyMatch[1].trim().length > 2) {
-        companyName = companyMatch[1].trim().replace(/\*\*/g, '');
+        companyName = cleanText(companyMatch[1]);
       } else if (source === "internshala") {
         companyName = "Internshala Partner";
       } else if (source === "linkedin") {
