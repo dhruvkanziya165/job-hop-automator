@@ -64,14 +64,10 @@ const JobListings = () => {
   }, [filteredJobs]);
 
   const fetchJobs = async () => {
+    // Fetch ALL jobs first, we'll do smart filtering on client side
     let query = supabase
       .from("job_postings")
       .select("*");
-    
-    // Apply location filter
-    if (filters.location) {
-      query = query.ilike("location", `%${filters.location}%`);
-    }
     
     // Apply job type filter
     if (filters.jobType && filters.jobType !== "both") {
@@ -80,14 +76,77 @@ const JobListings = () => {
     
     const { data, error } = await query
       .order("fetched_at", { ascending: false })
-      .limit(1000); // Show up to 1000 jobs
+      .limit(2000); // Fetch more jobs for better filtering
 
     if (error) {
       toast.error("Failed to fetch jobs");
       return;
     }
 
-    setJobs(data || []);
+    // Smart location filtering on client side
+    let filteredData = data || [];
+    
+    if (filters.location) {
+      const searchLocation = filters.location.toLowerCase().trim();
+      
+      // Extract city and state from location (e.g., "Ahmedabad" or "Ahmedabad, Gujarat")
+      const locationParts = searchLocation.split(',').map(p => p.trim());
+      const city = locationParts[0];
+      const state = locationParts[1] || '';
+      
+      // Priority-based filtering
+      const exactMatches: typeof filteredData = [];
+      const stateMatches: typeof filteredData = [];
+      const remoteMatches: typeof filteredData = [];
+      const indiaMatches: typeof filteredData = [];
+      const otherMatches: typeof filteredData = [];
+      
+      filteredData.forEach(job => {
+        const jobLocation = (job.location || '').toLowerCase();
+        
+        // Priority 1: Exact city match
+        if (jobLocation.includes(city)) {
+          exactMatches.push(job);
+        }
+        // Priority 2: State match (for Indian cities)
+        else if (state && jobLocation.includes(state)) {
+          stateMatches.push(job);
+        }
+        // Priority 3: Remote/WFH jobs (always relevant)
+        else if (
+          jobLocation.includes('remote') || 
+          jobLocation.includes('wfh') || 
+          jobLocation.includes('work from home') ||
+          jobLocation.includes('anywhere')
+        ) {
+          remoteMatches.push(job);
+        }
+        // Priority 4: India-wide jobs (relevant for Indian cities)
+        else if (jobLocation.includes('india') || jobLocation.includes('pan india')) {
+          indiaMatches.push(job);
+        }
+        // Priority 5: Other jobs
+        else {
+          otherMatches.push(job);
+        }
+      });
+      
+      // Combine in priority order
+      filteredData = [
+        ...exactMatches,
+        ...stateMatches,
+        ...remoteMatches,
+        ...indiaMatches,
+        // Only include other matches if we have < 20 jobs total
+        ...(exactMatches.length + stateMatches.length + remoteMatches.length + indiaMatches.length < 20 
+          ? otherMatches.slice(0, 30) 
+          : [])
+      ];
+      
+      console.log(`Location filter "${filters.location}": ${exactMatches.length} exact, ${stateMatches.length} state, ${remoteMatches.length} remote, ${indiaMatches.length} India-wide`);
+    }
+
+    setJobs(filteredData);
     setLoading(false);
   };
 

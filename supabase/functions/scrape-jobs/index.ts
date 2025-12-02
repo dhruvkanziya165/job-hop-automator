@@ -170,11 +170,15 @@ serve(async (req) => {
           },
           body: JSON.stringify({
             url: searchUrl,
-            limit: 200, // Increased to 200 pages per board for more jobs
+            limit: 300, // Increased to 300 pages for comprehensive coverage
             scrapeOptions: {
               formats: ["markdown"],
               includePaths: boardName === "internshala" 
                 ? ["internships/*", "jobs/*"]
+                : boardName === "naukri"
+                ? ["*-jobs-*"]
+                : boardName === "fresherworld"
+                ? ["jobs/*"]
                 : undefined,
             },
           }),
@@ -335,20 +339,23 @@ function parseJobsFromContent(content: string, source: string, baseUrl: string, 
       continue;
     }
     
-    // Enhanced patterns for better extraction - more lenient matching
+    // Enhanced patterns for better extraction - more lenient matching with more roles
     const titleMatch = section.match(/^#+\s*(.+?)(?:\n|$)/m) || 
-                      section.match(/^[*_]*(.+?(?:Engineer|Developer|Intern|Manager|Analyst|Designer|Architect|Specialist|Lead|Executive|Associate|Trainee).+?)[*_]*$/mi) ||
-                      section.match(/\*\*(.+?(?:Engineer|Developer|Intern|Manager|Analyst|Designer|role|position).+?)\*\*/i);
+                      section.match(/^[*_]*(.+?(?:Engineer|Developer|Intern|Manager|Analyst|Designer|Architect|Specialist|Lead|Executive|Associate|Trainee|Consultant|Coordinator|Officer|Assistant|Graduate|Fresher|Entry|Junior|Senior|Full Stack|Frontend|Backend|Data|Software|Web|Mobile|Cloud|DevOps|QA|Testing|Marketing|Sales|HR|Finance|Operations).+?)[*_]*$/mi) ||
+                      section.match(/\*\*(.+?(?:Engineer|Developer|Intern|Manager|Analyst|Designer|role|position|opportunity|opening|vacancy).+?)\*\*/i) ||
+                      section.match(/^(?:Job Title|Position|Role)\s*[:\-]\s*(.+?)(?:\n|$)/mi);
     
-    // Better company extraction - more patterns
-    const companyMatch = section.match(/(?:Company|Organization|at|@|by|with)\s*[:\-]?\s*([A-Z][A-Za-z\s&\.\-,']{2,50})(?:\n|\||$)/i) ||
-                        section.match(/([A-Z][A-Za-z\s&\.]{2,30})\s*(?:is hiring|seeks|looking for|invites)/i) ||
-                        section.match(/\*\*Company\*\*\s*[:\-]?\s*(.+?)(?:\n|$)/i);
+    // Better company extraction - more patterns and lenient matching
+    const companyMatch = section.match(/(?:Company|Organization|Employer|at|@|by|with|for)\s*[:\-]?\s*([A-Z][A-Za-z\s&\.\-,']{2,50})(?:\n|\||$)/i) ||
+                        section.match(/([A-Z][A-Za-z\s&\.]{2,30})\s*(?:is hiring|seeks|looking for|invites|announces|offers)/i) ||
+                        section.match(/\*\*(?:Company|Organization|Employer)\*\*\s*[:\-]?\s*(.+?)(?:\n|$)/i) ||
+                        section.match(/^([A-Z][A-Za-z\s&\.]{3,40})\s*[\-–]\s*(?:Hiring|Job|Internship|Opening|Vacancy)/i);
     
-    // Better location extraction - include Indian cities
-    const locationMatch = section.match(/(?:Location|Based in|Office|Work from|City)\s*[:\-]?\s*([A-Za-z\s,\-]+?)(?:\n|\||$)/i) ||
-                         section.match(/\b(Remote|Hybrid|On-?site|WFH|Work from Home|Mumbai|Delhi|Bangalore|Hyderabad|Chennai|Pune|Kolkata|Ahmedabad|Surat|Jaipur|Lucknow|Kanpur|Nagpur|Indore|Noida|Gurugram|Gurgaon)\b/i) ||
-                         section.match(/\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*,\s*[A-Z]{2,})\b/);
+    // Better location extraction - include Indian cities and more patterns
+    const locationMatch = section.match(/(?:Location|Based in|Office|Work from|City|Place)\s*[:\-]?\s*([A-Za-z\s,\-]+?)(?:\n|\||$)/i) ||
+                         section.match(/\b(Remote|Hybrid|On-?site|WFH|Work from Home|Work From Anywhere|Pan India|India|Mumbai|Delhi|Bangalore|Bengaluru|Hyderabad|Chennai|Pune|Kolkata|Ahmedabad|Surat|Jaipur|Lucknow|Kanpur|Nagpur|Indore|Noida|Gurugram|Gurgaon|Kochi|Coimbatore|Vadodara|Chandigarh|Visakhapatnam|Bhopal|Patna|Ludhiana|Agra|Nashik|Faridabad|Meerut|Rajkot|Varanasi|Srinagar|Aurangabad|Dhanbad|Amritsar|Ranchi)\b/i) ||
+                         section.match(/\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*,\s*(?:India|Gujarat|Maharashtra|Karnataka|Tamil Nadu|Delhi|Telangana|West Bengal|Rajasthan|Uttar Pradesh|Madhya Pradesh|Kerala|Punjab|Haryana))\b/i) ||
+                         section.match(/\*\*(?:Location|City)\*\*\s*[:\-]?\s*(.+?)(?:\n|$)/i);
     
     // Better salary extraction with INR support - more formats
     const salaryMatch = section.match(/(?:Salary|Compensation|Pay|CTC|Stipend|Package)\s*[:\-]?\s*([\d,k₹\$€£\-\s\/]+(?:per year|per month|\/yr|\/mo|LPA|lpa|PA|per annum|pm|\/month)?)/i) ||
@@ -403,10 +410,31 @@ function parseJobsFromContent(content: string, source: string, baseUrl: string, 
         companyName = "FreshersWorld Partner";
       }
       
-      // Better location handling
+      // Better location handling with normalization
       let location = "Remote";
       if (locationMatch) {
         location = locationMatch[1].trim();
+        // Normalize common variations
+        location = location
+          .replace(/Bengaluru/gi, "Bangalore")
+          .replace(/Gurgaon/gi, "Gurugram")
+          .replace(/\bNCR\b/gi, "Delhi NCR")
+          .replace(/WFH/gi, "Remote")
+          .replace(/Work from Home/gi, "Remote")
+          .replace(/Work From Anywhere/gi, "Remote");
+        
+        // Add "India" suffix for Indian cities if not present
+        const indianCities = [
+          'Mumbai', 'Delhi', 'Bangalore', 'Hyderabad', 'Chennai', 'Pune', 'Kolkata',
+          'Ahmedabad', 'Surat', 'Jaipur', 'Lucknow', 'Kanpur', 'Nagpur', 'Indore',
+          'Noida', 'Gurugram', 'Kochi', 'Coimbatore', 'Vadodara', 'Chandigarh'
+        ];
+        const hasIndianCity = indianCities.some(city => 
+          location.toLowerCase().includes(city.toLowerCase())
+        );
+        if (hasIndianCity && !location.toLowerCase().includes('india') && !location.includes(',')) {
+          location = `${location}, India`;
+        }
       }
       
       jobs.push({
