@@ -43,7 +43,7 @@ const JobListings = () => {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [filteredJobs, setFilteredJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState<{ location?: string; jobType?: string; salaryMin?: number; salaryMax?: number }>({ jobType: "both" });
+  const [filters, setFilters] = useState<{ location?: string; jobType?: string; salaryMin?: number; salaryMax?: number; keywords?: string[] }>({ jobType: "both" });
   const [matchScores, setMatchScores] = useState<Record<string, { score: number; reasons: string[] }>>({});
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -54,8 +54,8 @@ const JobListings = () => {
   }, [filters.location, filters.jobType]);
 
   useEffect(() => {
-    filterJobsBySalary();
-  }, [jobs, filters.salaryMin, filters.salaryMax]);
+    filterJobsBySalaryAndKeywords();
+  }, [jobs, filters.salaryMin, filters.salaryMax, filters.keywords]);
 
   useEffect(() => {
     if (filteredJobs.length > 0) {
@@ -194,22 +194,31 @@ const JobListings = () => {
     }
   };
 
-  const filterJobsBySalary = () => {
-    if (filters.salaryMin === undefined && filters.salaryMax === undefined) {
-      setFilteredJobs(jobs);
-      return;
+  const filterJobsBySalaryAndKeywords = () => {
+    let filtered = jobs;
+
+    // Filter by salary
+    if (filters.salaryMin !== undefined || filters.salaryMax !== undefined) {
+      filtered = filtered.filter(job => {
+        const salaryRange = parseSalaryRange(job.salary_range);
+        if (!salaryRange) return true; // Include jobs without salary info
+        
+        const filterMin = filters.salaryMin || 0;
+        const filterMax = filters.salaryMax || Infinity;
+        
+        // Job matches if its salary range overlaps with filter range
+        return salaryRange.max >= filterMin && salaryRange.min <= filterMax;
+      });
     }
 
-    const filtered = jobs.filter(job => {
-      const salaryRange = parseSalaryRange(job.salary_range);
-      if (!salaryRange) return true; // Include jobs without salary info
-      
-      const filterMin = filters.salaryMin || 0;
-      const filterMax = filters.salaryMax || Infinity;
-      
-      // Job matches if its salary range overlaps with filter range
-      return salaryRange.max >= filterMin && salaryRange.min <= filterMax;
-    });
+    // Filter by keywords
+    if (filters.keywords && filters.keywords.length > 0) {
+      filtered = filtered.filter(job => {
+        const searchText = `${job.title} ${job.description} ${job.company}`.toLowerCase();
+        // Job matches if it contains ANY of the keywords
+        return filters.keywords!.some(keyword => searchText.includes(keyword.toLowerCase()));
+      });
+    }
 
     setFilteredJobs(filtered);
   };
