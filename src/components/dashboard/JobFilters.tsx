@@ -2,16 +2,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
-import { MapPin, Briefcase, X, DollarSign } from "lucide-react";
+import { MapPin, Briefcase, X, DollarSign, Tags } from "lucide-react";
 import { useState } from "react";
 
 interface JobFiltersProps {
-  onFilterChange: (filters: { location?: string; jobType?: string; salaryMin?: number; salaryMax?: number }) => void;
-  currentFilters: { location?: string; jobType?: string; salaryMin?: number; salaryMax?: number };
+  onFilterChange: (filters: { location?: string; jobType?: string; salaryMin?: number; salaryMax?: number; keywords?: string[] }) => void;
+  currentFilters: { location?: string; jobType?: string; salaryMin?: number; salaryMax?: number; keywords?: string[] };
 }
 
 const JobFilters = ({ onFilterChange, currentFilters }: JobFiltersProps) => {
   const [locationInput, setLocationInput] = useState("");
+  const [keywordInput, setKeywordInput] = useState("");
 
   const handleLocationAdd = () => {
     if (locationInput.trim()) {
@@ -42,6 +43,22 @@ const JobFilters = ({ onFilterChange, currentFilters }: JobFiltersProps) => {
       salaryMin: undefined, 
       salaryMax: undefined 
     });
+  };
+
+  const handleKeywordAdd = () => {
+    if (keywordInput.trim()) {
+      const currentKeywords = currentFilters.keywords || [];
+      const newKeyword = keywordInput.trim().toLowerCase();
+      if (!currentKeywords.includes(newKeyword)) {
+        onFilterChange({ ...currentFilters, keywords: [...currentKeywords, newKeyword] });
+      }
+      setKeywordInput("");
+    }
+  };
+
+  const removeKeyword = (keyword: string) => {
+    const updatedKeywords = (currentFilters.keywords || []).filter(k => k !== keyword);
+    onFilterChange({ ...currentFilters, keywords: updatedKeywords.length > 0 ? updatedKeywords : undefined });
   };
 
   return (
@@ -105,6 +122,38 @@ const JobFilters = ({ onFilterChange, currentFilters }: JobFiltersProps) => {
                 onClick={clearLocation}
               />
             </Badge>
+          </div>
+        )}
+      </div>
+
+      {/* Skills/Keywords Filter */}
+      <div>
+        <label className="text-sm font-medium mb-2 block flex items-center gap-2">
+          <Tags className="h-4 w-4" />
+          Skills & Keywords
+        </label>
+        <div className="flex gap-2">
+          <Input
+            placeholder="e.g., React, Python, AWS"
+            value={keywordInput}
+            onChange={(e) => setKeywordInput(e.target.value)}
+            onKeyPress={(e) => e.key === "Enter" && handleKeywordAdd()}
+          />
+          <Button size="sm" onClick={handleKeywordAdd}>
+            Add
+          </Button>
+        </div>
+        {currentFilters.keywords && currentFilters.keywords.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {currentFilters.keywords.map((keyword) => (
+              <Badge key={keyword} variant="secondary" className="gap-1">
+                {keyword}
+                <X
+                  className="h-3 w-3 cursor-pointer"
+                  onClick={() => removeKeyword(keyword)}
+                />
+              </Badge>
+            ))}
           </div>
         )}
       </div>
