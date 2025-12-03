@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { 
   Building2, 
   MapPin, 
@@ -16,6 +17,8 @@ import { toast } from "sonner";
 import JobFilters from "./JobFilters";
 import { CircularProgress } from "./CircularProgress";
 import { JobDetailsModal } from "./JobDetailsModal";
+import { BulkApplyModal } from "./BulkApplyModal";
+import { BulkSelectBar } from "./BulkSelectBar";
 
 // Helper function to clean markdown links and extract text
 const cleanMarkdownText = (text: string): string => {
@@ -48,6 +51,10 @@ const JobListings = () => {
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [similarJobs, setSimilarJobs] = useState<Job[]>([]);
+  
+  // Bulk selection state
+  const [selectedJobIds, setSelectedJobIds] = useState<Set<string>>(new Set());
+  const [bulkApplyModalOpen, setBulkApplyModalOpen] = useState(false);
 
   useEffect(() => {
     fetchJobs();
@@ -287,6 +294,35 @@ const JobListings = () => {
     fetchJobs();
   };
 
+  // Bulk selection handlers
+  const toggleJobSelection = (jobId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setSelectedJobIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(jobId)) {
+        newSet.delete(jobId);
+      } else {
+        newSet.add(jobId);
+      }
+      return newSet;
+    });
+  };
+
+  const selectAllJobs = () => {
+    setSelectedJobIds(new Set(filteredJobs.map(j => j.id)));
+  };
+
+  const clearSelection = () => {
+    setSelectedJobIds(new Set());
+  };
+
+  const handleBulkApplyComplete = () => {
+    clearSelection();
+    fetchJobs();
+  };
+
+  const selectedJobs = filteredJobs.filter(j => selectedJobIds.has(j.id));
+
   if (loading) {
     return (
       <Card className="p-6">
@@ -336,17 +372,32 @@ const JobListings = () => {
           const cleanDescription = cleanMarkdownText(job.description || "");
           const cleanCompany = cleanMarkdownText(job.company);
           const matchScore = matchScores[job.id];
+          const isSelected = selectedJobIds.has(job.id);
           
           return (
             <Card 
               key={job.id} 
-              className="group relative overflow-hidden border-2 hover:border-primary/50 transition-all duration-300 hover:shadow-xl bg-gradient-to-br from-background to-background/50 cursor-pointer"
+              className={`group relative overflow-hidden border-2 transition-all duration-300 hover:shadow-xl bg-gradient-to-br from-background to-background/50 cursor-pointer ${
+                isSelected ? "border-primary ring-2 ring-primary/20" : "hover:border-primary/50"
+              }`}
               onClick={() => handleJobClick(job)}
             >
               <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-primary/10 to-transparent rounded-bl-full opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
               
               <div className="relative p-6 space-y-4">
                 <div className="flex items-start justify-between gap-4">
+                  {/* Checkbox for bulk selection */}
+                  <div 
+                    className="shrink-0 pt-1"
+                    onClick={(e) => toggleJobSelection(job.id, e)}
+                  >
+                    <Checkbox 
+                      checked={isSelected}
+                      onCheckedChange={() => toggleJobSelection(job.id)}
+                      className="h-5 w-5 border-2 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                    />
+                  </div>
+                  
                   {matchScore && (
                     <div className="shrink-0">
                       <CircularProgress value={matchScore.score} size={70} />
@@ -453,6 +504,24 @@ const JobListings = () => {
         similarJobs={similarJobs}
         onApply={handleApply}
         onJobSelect={handleJobClick}
+      />
+
+      {/* Bulk Selection Bar */}
+      <BulkSelectBar
+        selectedCount={selectedJobIds.size}
+        totalCount={Math.min(filteredJobs.length, 50)}
+        onSelectAll={selectAllJobs}
+        onClearSelection={clearSelection}
+        onBulkApply={() => setBulkApplyModalOpen(true)}
+        isAllSelected={selectedJobIds.size === filteredJobs.length && filteredJobs.length > 0}
+      />
+
+      {/* Bulk Apply Modal */}
+      <BulkApplyModal
+        open={bulkApplyModalOpen}
+        onOpenChange={setBulkApplyModalOpen}
+        selectedJobs={selectedJobs}
+        onComplete={handleBulkApplyComplete}
       />
     </div>
   );
