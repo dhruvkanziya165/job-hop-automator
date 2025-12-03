@@ -13,7 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    const { jobId, userId, subject, body, toEmail } = await req.json();
+    const { jobId, userId, subject, body, toEmail, resumeId } = await req.json();
     console.log(`Sending application for job ${jobId} to ${toEmail}`);
 
     const supabase = createClient(
@@ -45,6 +45,32 @@ serve(async (req) => {
       throw new Error("Job not found");
     }
 
+    // Fetch resume if provided
+    let resumeAttachment = null;
+    if (resumeId) {
+      const { data: resume } = await supabase
+        .from("resumes")
+        .select("*")
+        .eq("id", resumeId)
+        .single();
+
+      if (resume) {
+        // Get resume file from storage
+        const { data: fileData } = await supabase.storage
+          .from("resumes")
+          .download(resume.file_path);
+
+        if (fileData) {
+          const arrayBuffer = await fileData.arrayBuffer();
+          const base64Content = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+          resumeAttachment = {
+            filename: resume.file_name,
+            content: base64Content,
+          };
+        }
+      }
+    }
+
     // Format email with signature
     const emailHtml = `
       <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
@@ -58,13 +84,21 @@ serve(async (req) => {
       </div>
     `;
 
-    // Send email via Resend
-    const emailResponse = await resend.emails.send({
-      from: "JobAgent Pro <onboarding@resend.dev>", // Replace with your verified domain
+    // Build email options
+    const emailOptions: any = {
+      from: "JobAgent Pro <onboarding@resend.dev>",
       to: [toEmail],
       subject: subject,
       html: emailHtml,
-    });
+    };
+
+    // Add resume attachment if available
+    if (resumeAttachment) {
+      emailOptions.attachments = [resumeAttachment];
+    }
+
+    // Send email via Resend
+    const emailResponse = await resend.emails.send(emailOptions);
 
     console.log("Email sent successfully:", emailResponse);
 
