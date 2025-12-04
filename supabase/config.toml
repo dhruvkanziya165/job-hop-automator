@@ -14,3 +14,12 @@ verify_jwt = false
 
 [functions.daily-job-scrape]
 verify_jwt = false
+
+[functions.estimate-salary]
+verify_jwt = false
+
+[functions.generate-negotiation]
+verify_jwt = false
+
+[functions.calculate-job-match]
+verify_jwt = false

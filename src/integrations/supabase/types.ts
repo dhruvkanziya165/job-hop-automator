@@ -105,6 +105,63 @@ export type Database = {
         }
         Relationships: []
       }
+      job_offers: {
+        Row: {
+          base_salary: number
+          benefits: string[] | null
+          bonus: number | null
+          company: string
+          created_at: string
+          equity: string | null
+          id: string
+          location: string | null
+          notes: string | null
+          offer_deadline: string | null
+          remote_policy: string | null
+          role: string
+          start_date: string | null
+          status: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          base_salary: number
+          benefits?: string[] | null
+          bonus?: number | null
+          company: string
+          created_at?: string
+          equity?: string | null
+          id?: string
+          location?: string | null
+          notes?: string | null
+          offer_deadline?: string | null
+          remote_policy?: string | null
+          role: string
+          start_date?: string | null
+          status?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          base_salary?: number
+          benefits?: string[] | null
+          bonus?: number | null
+          company?: string
+          created_at?: string
+          equity?: string | null
+          id?: string
+          location?: string | null
+          notes?: string | null
+          offer_deadline?: string | null
+          remote_policy?: string | null
+          role?: string
+          start_date?: string | null
+          status?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       job_postings: {
         Row: {
           company: string
@@ -215,6 +272,51 @@ export type Database = {
           id?: string
           is_default?: boolean | null
           role_type?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      salary_estimates: {
+        Row: {
+          created_at: string
+          estimated_max: number | null
+          estimated_median: number | null
+          estimated_min: number | null
+          experience_years: number
+          id: string
+          location: string
+          market_trend: string | null
+          negotiation_tips: string[] | null
+          role: string
+          skills: string[] | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          estimated_max?: number | null
+          estimated_median?: number | null
+          estimated_min?: number | null
+          experience_years: number
+          id?: string
+          location: string
+          market_trend?: string | null
+          negotiation_tips?: string[] | null
+          role: string
+          skills?: string[] | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          estimated_max?: number | null
+          estimated_median?: number | null
+          estimated_min?: number | null
+          experience_years?: number
+          id?: string
+          location?: string
+          market_trend?: string | null
+          negotiation_tips?: string[] | null
+          role?: string
+          skills?: string[] | null
           user_id?: string
         }
         Relationships: []
