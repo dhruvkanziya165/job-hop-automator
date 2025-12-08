@@ -11,6 +11,7 @@ import ApplicationTracker from "./pages/ApplicationTracker";
 import ApplicationStats from "./pages/ApplicationStats";
 import SalaryInsights from "./pages/SalaryInsights";
 import ResumeOptimizer from "./pages/ResumeOptimizer";
+import NetworkingAssistant from "./pages/NetworkingAssistant";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -30,6 +31,7 @@ const App = () => (
           <Route path="/stats" element={<ApplicationStats />} />
           <Route path="/salary" element={<SalaryInsights />} />
           <Route path="/resume" element={<ResumeOptimizer />} />
+          <Route path="/networking" element={<NetworkingAssistant />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
