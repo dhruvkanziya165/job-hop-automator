@@ -105,6 +105,54 @@ export type Database = {
         }
         Relationships: []
       }
+      follow_up_schedules: {
+        Row: {
+          contact_id: string | null
+          created_at: string
+          follow_up_number: number | null
+          id: string
+          message_id: string | null
+          scheduled_date: string
+          status: string | null
+          user_id: string
+        }
+        Insert: {
+          contact_id?: string | null
+          created_at?: string
+          follow_up_number?: number | null
+          id?: string
+          message_id?: string | null
+          scheduled_date: string
+          status?: string | null
+          user_id: string
+        }
+        Update: {
+          contact_id?: string | null
+          created_at?: string
+          follow_up_number?: number | null
+          id?: string
+          message_id?: string | null
+          scheduled_date?: string
+          status?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "follow_up_schedules_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "networking_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "follow_up_schedules_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "outreach_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       job_offers: {
         Row: {
           base_salary: number
@@ -209,6 +257,111 @@ export type Database = {
           url?: string
         }
         Relationships: []
+      }
+      networking_contacts: {
+        Row: {
+          company: string | null
+          contact_type: string | null
+          created_at: string
+          email: string | null
+          id: string
+          linkedin_url: string | null
+          name: string
+          notes: string | null
+          status: string | null
+          title: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          company?: string | null
+          contact_type?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          linkedin_url?: string | null
+          name: string
+          notes?: string | null
+          status?: string | null
+          title?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          company?: string | null
+          contact_type?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          linkedin_url?: string | null
+          name?: string
+          notes?: string | null
+          status?: string | null
+          title?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      outreach_messages: {
+        Row: {
+          contact_id: string | null
+          content: string
+          created_at: string
+          id: string
+          job_id: string | null
+          message_type: string
+          opened_at: string | null
+          replied_at: string | null
+          sent_at: string | null
+          status: string | null
+          subject: string | null
+          user_id: string
+        }
+        Insert: {
+          contact_id?: string | null
+          content: string
+          created_at?: string
+          id?: string
+          job_id?: string | null
+          message_type: string
+          opened_at?: string | null
+          replied_at?: string | null
+          sent_at?: string | null
+          status?: string | null
+          subject?: string | null
+          user_id: string
+        }
+        Update: {
+          contact_id?: string | null
+          content?: string
+          created_at?: string
+          id?: string
+          job_id?: string | null
+          message_type?: string
+          opened_at?: string | null
+          replied_at?: string | null
+          sent_at?: string | null
+          status?: string | null
+          subject?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "outreach_messages_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "networking_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "outreach_messages_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "job_postings"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {

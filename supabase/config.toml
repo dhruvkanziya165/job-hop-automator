@@ -26,3 +26,6 @@ verify_jwt = false
 
 [functions.analyze-resume]
 verify_jwt = false
+
+[functions.generate-networking-message]
+verify_jwt = false
