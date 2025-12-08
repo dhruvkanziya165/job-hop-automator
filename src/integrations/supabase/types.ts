@@ -243,6 +243,66 @@ export type Database = {
         }
         Relationships: []
       }
+      resume_analyses: {
+        Row: {
+          analysis_type: string
+          ats_score: number | null
+          created_at: string
+          id: string
+          job_id: string | null
+          keyword_matches: Json | null
+          missing_keywords: Json | null
+          original_content: string | null
+          resume_id: string | null
+          suggestions: Json | null
+          tailored_content: string | null
+          user_id: string
+        }
+        Insert: {
+          analysis_type?: string
+          ats_score?: number | null
+          created_at?: string
+          id?: string
+          job_id?: string | null
+          keyword_matches?: Json | null
+          missing_keywords?: Json | null
+          original_content?: string | null
+          resume_id?: string | null
+          suggestions?: Json | null
+          tailored_content?: string | null
+          user_id: string
+        }
+        Update: {
+          analysis_type?: string
+          ats_score?: number | null
+          created_at?: string
+          id?: string
+          job_id?: string | null
+          keyword_matches?: Json | null
+          missing_keywords?: Json | null
+          original_content?: string | null
+          resume_id?: string | null
+          suggestions?: Json | null
+          tailored_content?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resume_analyses_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "job_postings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "resume_analyses_resume_id_fkey"
+            columns: ["resume_id"]
+            isOneToOne: false
+            referencedRelation: "resumes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       resumes: {
         Row: {
           created_at: string
