@@ -13,7 +13,8 @@ import {
   Bot,
   BarChart3,
   PieChart,
-  IndianRupee
+  IndianRupee,
+  FileCheck
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -68,6 +69,10 @@ const DashboardLayout = ({ children, automationContent }: DashboardLayoutProps) 
               <Button variant="ghost" size="sm" onClick={() => navigate("/salary")}>
                 <IndianRupee className="h-4 w-4 mr-2" />
                 Salary
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => navigate("/resume")}>
+                <FileCheck className="h-4 w-4 mr-2" />
+                Resume
               </Button>
               <Button variant="ghost" size="sm" onClick={() => navigate("/settings")}>
                 <Settings className="h-4 w-4 mr-2" />
