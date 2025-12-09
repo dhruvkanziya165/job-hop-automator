@@ -141,6 +141,54 @@ serve(async (req) => {
       }
     }
 
+    // Send confirmation email to user
+    try {
+      const confirmationHtml = `
+        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px 10px 0 0;">
+            <h1 style="color: white; margin: 0; font-size: 24px;">🎉 Application Sent Successfully!</h1>
+          </div>
+          <div style="padding: 30px; background: #f9fafb; border-radius: 0 0 10px 10px;">
+            <p>Hi ${profile.full_name || "there"},</p>
+            <p>Great news! Your job application has been successfully sent.</p>
+            
+            <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #667eea;">
+              <h3 style="margin: 0 0 10px 0; color: #667eea;">${job.title}</h3>
+              <p style="margin: 5px 0; color: #666;"><strong>Company:</strong> ${job.company}</p>
+              <p style="margin: 5px 0; color: #666;"><strong>Location:</strong> ${job.location || "Not specified"}</p>
+              <p style="margin: 5px 0; color: #666;"><strong>Applied:</strong> ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+            </div>
+            
+            <p><strong>What's next?</strong></p>
+            <ul style="color: #666;">
+              <li>Keep an eye on your inbox for responses from the employer</li>
+              <li>Track your application status in your dashboard</li>
+              <li>Continue applying to more jobs to maximize your chances</li>
+            </ul>
+            
+            <p style="margin-top: 20px;">Good luck with your job search! 🍀</p>
+            
+            <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
+            <p style="color: #999; font-size: 12px; text-align: center;">
+              This email was sent by JobAgent Pro. Track all your applications in your dashboard.
+            </p>
+          </div>
+        </div>
+      `;
+
+      await resend.emails.send({
+        from: "JobAgent Pro <onboarding@resend.dev>",
+        to: [profile.email],
+        subject: `✅ Application Sent: ${job.title} at ${job.company}`,
+        html: confirmationHtml,
+      });
+
+      console.log("Confirmation email sent to user:", profile.email);
+    } catch (confirmError) {
+      console.error("Error sending confirmation email:", confirmError);
+      // Don't fail the whole request if confirmation email fails
+    }
+
     return new Response(
       JSON.stringify({
         success: true,

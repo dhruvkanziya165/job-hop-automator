@@ -15,7 +15,8 @@ import {
   PieChart,
   IndianRupee,
   FileCheck,
-  Users
+  Users,
+  Target
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -78,6 +79,10 @@ const DashboardLayout = ({ children, automationContent }: DashboardLayoutProps) 
               <Button variant="ghost" size="sm" onClick={() => navigate("/networking")}>
                 <Users className="h-4 w-4 mr-2" />
                 Networking
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => navigate("/skills")}>
+                <Target className="h-4 w-4 mr-2" />
+                Skills
               </Button>
               <Button variant="ghost" size="sm" onClick={() => navigate("/settings")}>
                 <Settings className="h-4 w-4 mr-2" />

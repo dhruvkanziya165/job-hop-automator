@@ -534,6 +534,42 @@ export type Database = {
         }
         Relationships: []
       }
+      skill_gap_analyses: {
+        Row: {
+          course_recommendations: Json | null
+          created_at: string
+          current_skills: string[]
+          estimated_time: string | null
+          id: string
+          learning_roadmap: Json | null
+          missing_skills: Json | null
+          target_role: string
+          user_id: string
+        }
+        Insert: {
+          course_recommendations?: Json | null
+          created_at?: string
+          current_skills?: string[]
+          estimated_time?: string | null
+          id?: string
+          learning_roadmap?: Json | null
+          missing_skills?: Json | null
+          target_role: string
+          user_id: string
+        }
+        Update: {
+          course_recommendations?: Json | null
+          created_at?: string
+          current_skills?: string[]
+          estimated_time?: string | null
+          id?: string
+          learning_roadmap?: Json | null
+          missing_skills?: Json | null
+          target_role?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_preferences: {
         Row: {
           apply_mode: string
