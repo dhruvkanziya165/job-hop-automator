@@ -16,7 +16,8 @@ import {
   IndianRupee,
   FileCheck,
   Users,
-  Target
+  Target,
+  Compass
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -83,6 +84,10 @@ const DashboardLayout = ({ children, automationContent }: DashboardLayoutProps) 
               <Button variant="ghost" size="sm" onClick={() => navigate("/skills")}>
                 <Target className="h-4 w-4 mr-2" />
                 Skills
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => navigate("/career")}>
+                <Compass className="h-4 w-4 mr-2" />
+                Career
               </Button>
               <Button variant="ghost" size="sm" onClick={() => navigate("/settings")}>
                 <Settings className="h-4 w-4 mr-2" />

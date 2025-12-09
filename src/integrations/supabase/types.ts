@@ -78,6 +78,42 @@ export type Database = {
           },
         ]
       }
+      career_path_predictions: {
+        Row: {
+          created_at: string
+          experience_years: number
+          id: string
+          industry_insights: Json | null
+          predicted_paths: Json | null
+          role_title: string
+          salary_progression: Json | null
+          skills: string[]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          experience_years?: number
+          id?: string
+          industry_insights?: Json | null
+          predicted_paths?: Json | null
+          role_title: string
+          salary_progression?: Json | null
+          skills?: string[]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          experience_years?: number
+          id?: string
+          industry_insights?: Json | null
+          predicted_paths?: Json | null
+          role_title?: string
+          salary_progression?: Json | null
+          skills?: string[]
+          user_id?: string
+        }
+        Relationships: []
+      }
       cover_templates: {
         Row: {
           content: string
