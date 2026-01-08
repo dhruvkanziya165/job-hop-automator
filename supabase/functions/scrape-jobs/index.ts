@@ -17,7 +17,7 @@ interface JobPosting {
   job_type?: string;
 }
 
-// Job board URLs to scrape using Firecrawl
+// Job board URLs to scrape using Firecrawl - Enhanced with more sources
 const JOB_BOARDS: Record<string, string> = {
   internshala: "https://internshala.com/internships/",
   remoteok: "https://remoteok.com/",
@@ -25,6 +25,11 @@ const JOB_BOARDS: Record<string, string> = {
   linkedin: "https://www.linkedin.com/jobs/search/",
   naukri: "https://www.naukri.com/",
   fresherworld: "https://www.freshersworld.com/",
+  indeed: "https://www.indeed.com/jobs",
+  glassdoor: "https://www.glassdoor.com/Job/",
+  monster: "https://www.monster.com/jobs/search",
+  simplyhired: "https://www.simplyhired.com/search",
+  ziprecruiter: "https://www.ziprecruiter.com/jobs",
 };
 
 serve(async (req) => {
@@ -151,6 +156,52 @@ serve(async (req) => {
           } else {
             searchUrl = `https://www.freshersworld.com/jobs/jobsearch/${keywordQuery}-jobs-in-${locationQuery}`;
           }
+        } else if (boardName === "indeed") {
+          // Indeed job board
+          const indeedParams: string[] = [];
+          if (keywords && keywords.length > 0) {
+            indeedParams.push(`q=${encodeURIComponent(keywords.join(" "))}`);
+          }
+          if (location && location !== "any") {
+            indeedParams.push(`l=${encodeURIComponent(location)}`);
+          }
+          indeedParams.push(`fromage=7`); // Last 7 days
+          searchUrl = `${boardUrl}?${indeedParams.join("&")}`;
+        } else if (boardName === "glassdoor") {
+          // Glassdoor job board
+          const keywordQuery = keywords && keywords.length > 0 ? keywords.join("-") : "software-engineer";
+          const locationQuery = location && location !== "any" ? location.toLowerCase().replace(/\s+/g, "-") : "";
+          searchUrl = `https://www.glassdoor.com/Job/${locationQuery}-${keywordQuery}-jobs-SRCH_KO0,${keywordQuery.length}.htm`;
+        } else if (boardName === "monster") {
+          // Monster job board
+          const monsterParams: string[] = [];
+          if (keywords && keywords.length > 0) {
+            monsterParams.push(`q=${encodeURIComponent(keywords.join(" "))}`);
+          }
+          if (location && location !== "any") {
+            monsterParams.push(`where=${encodeURIComponent(location)}`);
+          }
+          searchUrl = `${boardUrl}?${monsterParams.join("&")}`;
+        } else if (boardName === "simplyhired") {
+          // SimplyHired job board
+          const shParams: string[] = [];
+          if (keywords && keywords.length > 0) {
+            shParams.push(`q=${encodeURIComponent(keywords.join(" "))}`);
+          }
+          if (location && location !== "any") {
+            shParams.push(`l=${encodeURIComponent(location)}`);
+          }
+          searchUrl = `${boardUrl}?${shParams.join("&")}`;
+        } else if (boardName === "ziprecruiter") {
+          // ZipRecruiter job board
+          const zrParams: string[] = [];
+          if (keywords && keywords.length > 0) {
+            zrParams.push(`search=${encodeURIComponent(keywords.join(" "))}`);
+          }
+          if (location && location !== "any") {
+            zrParams.push(`location=${encodeURIComponent(location)}`);
+          }
+          searchUrl = `${boardUrl}?${zrParams.join("&")}`;
         } else {
           // RemoteOK and Wellfound - add keyword filters
           if (keywords && keywords.length > 0 && params.length > 0) {
@@ -279,7 +330,12 @@ serve(async (req) => {
                job.url.includes("wellfound") ? "Wellfound" :
                job.url.includes("linkedin") ? "LinkedIn" :
                job.url.includes("naukri") ? "Naukri" :
-               job.url.includes("freshersworld") ? "FreshersWorld" : "Other",
+               job.url.includes("freshersworld") ? "FreshersWorld" :
+               job.url.includes("indeed") ? "Indeed" :
+               job.url.includes("glassdoor") ? "Glassdoor" :
+               job.url.includes("monster") ? "Monster" :
+               job.url.includes("simplyhired") ? "SimplyHired" :
+               job.url.includes("ziprecruiter") ? "ZipRecruiter" : "Other",
         salary_range: job.salary_range,
         job_type: job.job_type || "job",
         external_id: `${job.company}-${job.title}`.replace(/\s+/g, "-").toLowerCase(),

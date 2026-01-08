@@ -1,9 +1,12 @@
+import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Building2, MapPin, DollarSign, ExternalLink, Clock, Briefcase, CheckCircle2, Lightbulb } from "lucide-react";
+import { Building2, MapPin, DollarSign, ExternalLink, Clock, Briefcase, CheckCircle2, Lightbulb, Zap, Loader2 } from "lucide-react";
 import { CircularProgress } from "./CircularProgress";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface Job {
   id: string;
@@ -37,7 +40,55 @@ export const JobDetailsModal = ({
   onApply,
   onJobSelect
 }: JobDetailsModalProps) => {
+  const [isApplying, setIsApplying] = useState(false);
+
   if (!job) return null;
+
+  const handleAutoApply = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      toast.error("Please login to apply");
+      return;
+    }
+
+    setIsApplying(true);
+
+    try {
+      toast.info(`Generating application for ${job.title}...`);
+      
+      const { data: emailData, error: emailError } = await supabase.functions.invoke("generate-email", {
+        body: {
+          jobId: job.id,
+          userId: user.id,
+          emailType: "application",
+        },
+      });
+
+      if (emailError) throw new Error("Failed to generate email");
+
+      const hrEmail = `hr@${job.company.toLowerCase().replace(/[^a-z0-9]/g, '')}.com`;
+
+      const { error: sendError } = await supabase.functions.invoke("send-application", {
+        body: {
+          jobId: job.id,
+          userId: user.id,
+          subject: emailData.subject,
+          body: emailData.body,
+          toEmail: hrEmail,
+        },
+      });
+
+      if (sendError) throw new Error("Failed to send application");
+
+      toast.success(`🎉 Applied to ${job.title} at ${job.company}!`);
+      onOpenChange(false);
+    } catch (error) {
+      console.error("Auto-apply error:", error);
+      toast.error("Failed to auto-apply. Please try again.");
+    } finally {
+      setIsApplying(false);
+    }
+  };
 
   const cleanMarkdownText = (text: string): string => {
     if (!text) return "";
@@ -164,17 +215,27 @@ export const JobDetailsModal = ({
           <div className="flex gap-3 pt-4">
             <Button
               className="flex-1 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
-              onClick={() => {
-                window.open(job.url, "_blank");
-                onApply(job.id);
-                onOpenChange(false);
-              }}
+              onClick={handleAutoApply}
+              disabled={isApplying}
+            >
+              {isApplying ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Applying...
+                </>
+              ) : (
+                <>
+                  <Zap className="h-4 w-4 mr-2" />
+                  Auto Apply
+                </>
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => window.open(job.url, "_blank")}
             >
               <ExternalLink className="h-4 w-4 mr-2" />
-              Apply Now
-            </Button>
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Close
+              View Job
             </Button>
           </div>
         </div>

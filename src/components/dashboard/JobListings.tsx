@@ -11,7 +11,10 @@ import {
   ExternalLink,
   Clock,
   Briefcase,
-  Star
+  Star,
+  Zap,
+  Loader2,
+  Send
 } from "lucide-react";
 import { toast } from "sonner";
 import JobFilters from "./JobFilters";
@@ -55,6 +58,7 @@ const JobListings = () => {
   // Bulk selection state
   const [selectedJobIds, setSelectedJobIds] = useState<Set<string>>(new Set());
   const [bulkApplyModalOpen, setBulkApplyModalOpen] = useState(false);
+  const [applyingJobIds, setApplyingJobIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchJobs();
@@ -271,7 +275,10 @@ const JobListings = () => {
 
   const handleApply = async (jobId: string) => {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) {
+      toast.error("Please login to apply");
+      return;
+    }
 
     const { error } = await supabase
       .from("applications")
@@ -292,6 +299,64 @@ const JobListings = () => {
 
     toast.success("Application added to queue!");
     fetchJobs();
+  };
+
+  // Auto-apply with email sending
+  const handleAutoApply = async (job: Job) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      toast.error("Please login to apply");
+      return;
+    }
+
+    setApplyingJobIds(prev => new Set(prev).add(job.id));
+
+    try {
+      // First, generate the application email
+      toast.info(`Generating application for ${job.title}...`);
+      
+      const { data: emailData, error: emailError } = await supabase.functions.invoke("generate-email", {
+        body: {
+          jobId: job.id,
+          userId: user.id,
+          emailType: "application",
+        },
+      });
+
+      if (emailError) {
+        throw new Error("Failed to generate email");
+      }
+
+      // Create HR email from company name
+      const hrEmail = `hr@${job.company.toLowerCase().replace(/[^a-z0-9]/g, '')}.com`;
+
+      // Send the application
+      const { data: sendData, error: sendError } = await supabase.functions.invoke("send-application", {
+        body: {
+          jobId: job.id,
+          userId: user.id,
+          subject: emailData.subject,
+          body: emailData.body,
+          toEmail: hrEmail,
+        },
+      });
+
+      if (sendError) {
+        throw new Error("Failed to send application");
+      }
+
+      toast.success(`🎉 Applied to ${job.title} at ${job.company}! Check your email for confirmation.`);
+      fetchJobs();
+    } catch (error) {
+      console.error("Auto-apply error:", error);
+      toast.error("Failed to auto-apply. Please try again.");
+    } finally {
+      setApplyingJobIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(job.id);
+        return newSet;
+      });
+    }
   };
 
   // Bulk selection handlers
@@ -477,18 +542,41 @@ const JobListings = () => {
                       })}
                     </span>
                   </div>
-                  <Button
-                    size="sm"
-                    className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg hover:shadow-xl transition-all duration-300 font-semibold group-hover:scale-105"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      window.open(job.url, "_blank");
-                      handleApply(job.id);
-                    }}
-                  >
-                    <ExternalLink className="h-4 w-4 mr-2" />
-                    Apply Now
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="font-semibold"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        window.open(job.url, "_blank");
+                      }}
+                    >
+                      <ExternalLink className="h-4 w-4 mr-1" />
+                      View
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg hover:shadow-xl transition-all duration-300 font-semibold"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAutoApply(job);
+                      }}
+                      disabled={applyingJobIds.has(job.id)}
+                    >
+                      {applyingJobIds.has(job.id) ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                          Applying...
+                        </>
+                      ) : (
+                        <>
+                          <Zap className="h-4 w-4 mr-1" />
+                          Auto Apply
+                        </>
+                      )}
+                    </Button>
+                  </div>
                 </div>
               </div>
             </Card>

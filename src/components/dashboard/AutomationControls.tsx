@@ -148,9 +148,12 @@ export const AutomationControls = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <RefreshCw className="h-5 w-5" />
+            Quick Actions
+          </CardTitle>
           <CardDescription>
-            Scrape 100+ jobs daily from LinkedIn, Internshala, RemoteOK & Wellfound
+            Scrape 500+ jobs from 11 platforms: LinkedIn, Indeed, Naukri, Internshala, Glassdoor, Monster, RemoteOK, Wellfound, FreshersWorld, SimplyHired & ZipRecruiter
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -163,17 +166,17 @@ export const AutomationControls = () => {
             {isScraping ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Crawling Multiple Pages...
+                Crawling 11 Platforms...
               </>
             ) : (
               <>
                 <RefreshCw className="mr-2 h-4 w-4" />
-                Scrape 100+ Jobs Now
+                Scrape 500+ Jobs Now
               </>
             )}
           </Button>
           <p className="text-xs text-muted-foreground">
-            Crawls up to 100 pages per platform to discover 500+ jobs & 100+ internships
+            Crawls LinkedIn, Indeed, Naukri, Internshala, Glassdoor & 6 more platforms
           </p>
 
           <Button
