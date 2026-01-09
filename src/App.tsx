@@ -15,6 +15,7 @@ import NetworkingAssistant from "./pages/NetworkingAssistant";
 import SkillGapAnalysis from "./pages/SkillGapAnalysis";
 import CareerPathPredictor from "./pages/CareerPathPredictor";
 import InterviewCalendar from "./pages/InterviewCalendar";
+import MockInterview from "./pages/MockInterview";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -38,6 +39,7 @@ const App = () => (
           <Route path="/skills" element={<SkillGapAnalysis />} />
           <Route path="/career" element={<CareerPathPredictor />} />
           <Route path="/interviews" element={<InterviewCalendar />} />
+          <Route path="/mock-interview" element={<MockInterview />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

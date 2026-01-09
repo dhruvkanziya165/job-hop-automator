@@ -18,7 +18,8 @@ import {
   Users,
   Target,
   Compass,
-  Calendar
+  Calendar,
+  Mic
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -93,6 +94,10 @@ const DashboardLayout = ({ children, automationContent }: DashboardLayoutProps) 
               <Button variant="ghost" size="sm" onClick={() => navigate("/interviews")}>
                 <Calendar className="h-4 w-4 mr-2" />
                 Interviews
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => navigate("/mock-interview")}>
+                <Mic className="h-4 w-4 mr-2" />
+                Practice
               </Button>
               <Button variant="ghost" size="sm" onClick={() => navigate("/settings")}>
                 <Settings className="h-4 w-4 mr-2" />
