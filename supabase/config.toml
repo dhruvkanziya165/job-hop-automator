@@ -38,3 +38,6 @@ verify_jwt = false
 
 [functions.send-interview-reminder]
 verify_jwt = false
+
+[functions.mock-interview]
+verify_jwt = false
