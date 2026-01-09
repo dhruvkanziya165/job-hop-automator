@@ -17,7 +17,8 @@ import {
   FileCheck,
   Users,
   Target,
-  Compass
+  Compass,
+  Calendar
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -88,6 +89,10 @@ const DashboardLayout = ({ children, automationContent }: DashboardLayoutProps) 
               <Button variant="ghost" size="sm" onClick={() => navigate("/career")}>
                 <Compass className="h-4 w-4 mr-2" />
                 Career
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => navigate("/interviews")}>
+                <Calendar className="h-4 w-4 mr-2" />
+                Interviews
               </Button>
               <Button variant="ghost" size="sm" onClick={() => navigate("/settings")}>
                 <Settings className="h-4 w-4 mr-2" />

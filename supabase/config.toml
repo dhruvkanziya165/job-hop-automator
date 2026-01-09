@@ -35,3 +35,6 @@ verify_jwt = false
 
 [functions.predict-career]
 verify_jwt = false
+
+[functions.send-interview-reminder]
+verify_jwt = false
