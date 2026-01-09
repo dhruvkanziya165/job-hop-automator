@@ -189,6 +189,68 @@ export type Database = {
           },
         ]
       }
+      interviews: {
+        Row: {
+          application_id: string | null
+          created_at: string
+          duration_minutes: number | null
+          id: string
+          interview_type: string
+          interviewer_email: string | null
+          interviewer_name: string | null
+          location: string | null
+          meeting_link: string | null
+          notes: string | null
+          reminder_sent: boolean | null
+          scheduled_at: string
+          status: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          application_id?: string | null
+          created_at?: string
+          duration_minutes?: number | null
+          id?: string
+          interview_type?: string
+          interviewer_email?: string | null
+          interviewer_name?: string | null
+          location?: string | null
+          meeting_link?: string | null
+          notes?: string | null
+          reminder_sent?: boolean | null
+          scheduled_at: string
+          status?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          application_id?: string | null
+          created_at?: string
+          duration_minutes?: number | null
+          id?: string
+          interview_type?: string
+          interviewer_email?: string | null
+          interviewer_name?: string | null
+          location?: string | null
+          meeting_link?: string | null
+          notes?: string | null
+          reminder_sent?: boolean | null
+          scheduled_at?: string
+          status?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "interviews_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       job_offers: {
         Row: {
           base_salary: number

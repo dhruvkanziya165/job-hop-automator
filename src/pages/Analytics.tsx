@@ -7,6 +7,10 @@ import ApplicationSuccessChart from "@/components/analytics/ApplicationSuccessCh
 import ResponseTimeChart from "@/components/analytics/ResponseTimeChart";
 import JobMarketTrendsChart from "@/components/analytics/JobMarketTrendsChart";
 import AnalyticsStats from "@/components/analytics/AnalyticsStats";
+import { ApplicationTrendsChart } from "@/components/analytics/ApplicationTrendsChart";
+import { StatusDistributionChart } from "@/components/analytics/StatusDistributionChart";
+import { CompanyPerformanceChart } from "@/components/analytics/CompanyPerformanceChart";
+import { WeeklyActivityChart } from "@/components/analytics/WeeklyActivityChart";
 import { toast } from "sonner";
 
 const Analytics = () => {
@@ -81,6 +85,17 @@ const Analytics = () => {
         </div>
 
         <AnalyticsStats applications={analyticsData?.applications || []} />
+
+        {/* Trends Overview */}
+        <ApplicationTrendsChart applications={analyticsData?.applications || []} />
+
+        {/* Charts Grid */}
+        <div className="grid md:grid-cols-2 gap-6">
+          <StatusDistributionChart applications={analyticsData?.applications || []} />
+          <WeeklyActivityChart applications={analyticsData?.applications || []} />
+        </div>
+
+        <CompanyPerformanceChart applications={analyticsData?.applications || []} />
 
         <Tabs defaultValue="success" className="space-y-4">
           <TabsList>
