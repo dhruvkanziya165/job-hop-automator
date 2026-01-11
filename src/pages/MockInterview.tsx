@@ -30,7 +30,17 @@ interface Question {
   type: string;
   difficulty: string;
   tips: string;
+  companyFocus?: string;
 }
+
+const COMPANIES = [
+  { id: 'google', name: 'Google', color: 'from-blue-500 to-green-500', logo: '🔍' },
+  { id: 'amazon', name: 'Amazon', color: 'from-orange-500 to-yellow-500', logo: '📦' },
+  { id: 'microsoft', name: 'Microsoft', color: 'from-blue-600 to-cyan-500', logo: '💻' },
+  { id: 'meta', name: 'Meta', color: 'from-blue-500 to-purple-500', logo: '👥' },
+  { id: 'apple', name: 'Apple', color: 'from-gray-600 to-gray-400', logo: '🍎' },
+  { id: 'netflix', name: 'Netflix', color: 'from-red-600 to-red-500', logo: '🎬' },
+];
 
 interface Feedback {
   score: number;
@@ -43,6 +53,7 @@ interface Feedback {
 const MockInterview = () => {
   const [role, setRole] = useState("");
   const [questionType, setQuestionType] = useState("behavioral");
+  const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answer, setAnswer] = useState("");
@@ -62,7 +73,7 @@ const MockInterview = () => {
     setIsGenerating(true);
     try {
       const { data, error } = await supabase.functions.invoke('mock-interview', {
-        body: { action: 'generate_questions', role, questionType }
+        body: { action: 'generate_questions', role, questionType, company: selectedCompany }
       });
 
       if (error) throw error;
@@ -137,6 +148,11 @@ const MockInterview = () => {
     setFeedback(null);
     setCompletedQuestions([]);
     setScores([]);
+    setSelectedCompany(null);
+  };
+
+  const getSelectedCompanyInfo = () => {
+    return COMPANIES.find(c => c.id === selectedCompany);
   };
 
   const averageScore = scores.length > 0 
@@ -165,58 +181,112 @@ const MockInterview = () => {
         </div>
 
         {!sessionStarted ? (
-          <Card className="max-w-2xl">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Mic className="h-5 w-5 text-primary" />
-                Start Practice Session
-              </CardTitle>
-              <CardDescription>
-                Enter your target role and question type to generate personalized interview questions
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Target Role</label>
-                <Input
-                  placeholder="e.g., Software Engineer, Product Manager, Data Scientist"
-                  value={role}
-                  onChange={(e) => setRole(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Question Type</label>
-                <Select value={questionType} onValueChange={setQuestionType}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="behavioral">Behavioral</SelectItem>
-                    <SelectItem value="technical">Technical</SelectItem>
-                    <SelectItem value="situational">Situational</SelectItem>
-                    <SelectItem value="mixed">Mixed</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button 
-                onClick={generateQuestions} 
-                disabled={isGenerating}
-                className="w-full"
-              >
-                {isGenerating ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Generating Questions...
-                  </>
-                ) : (
-                  <>
-                    <Play className="mr-2 h-4 w-4" />
-                    Start Interview
-                  </>
+          <div className="space-y-6">
+            {/* Company Selection */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Target className="h-5 w-5 text-primary" />
+                  Select Target Company (Optional)
+                </CardTitle>
+                <CardDescription>
+                  Choose a specific company to get tailored questions matching their interview style and culture
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                  {COMPANIES.map((company) => (
+                    <button
+                      key={company.id}
+                      onClick={() => setSelectedCompany(selectedCompany === company.id ? null : company.id)}
+                      className={`relative p-4 rounded-lg border-2 transition-all hover:scale-105 ${
+                        selectedCompany === company.id
+                          ? 'border-primary bg-primary/10 shadow-lg'
+                          : 'border-border hover:border-primary/50 bg-card'
+                      }`}
+                    >
+                      <div className="text-center space-y-2">
+                        <span className="text-3xl">{company.logo}</span>
+                        <p className="font-medium text-sm">{company.name}</p>
+                      </div>
+                      {selectedCompany === company.id && (
+                        <div className="absolute -top-2 -right-2">
+                          <CheckCircle2 className="h-5 w-5 text-primary fill-primary/20" />
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+                {selectedCompany && (
+                  <div className="mt-4 p-4 rounded-lg bg-muted">
+                    <div className="flex items-center gap-2 text-sm">
+                      <Sparkles className="h-4 w-4 text-primary" />
+                      <span>
+                        Questions will be tailored to <strong>{getSelectedCompanyInfo()?.name}</strong>'s interview style, culture, and values
+                      </span>
+                    </div>
+                  </div>
                 )}
-              </Button>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+
+            {/* Session Setup */}
+            <Card className="max-w-2xl">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Mic className="h-5 w-5 text-primary" />
+                  Start Practice Session
+                </CardTitle>
+                <CardDescription>
+                  {selectedCompany 
+                    ? `Practice with ${getSelectedCompanyInfo()?.name}-style interview questions`
+                    : 'Enter your target role and question type to generate personalized interview questions'
+                  }
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Target Role</label>
+                  <Input
+                    placeholder="e.g., Software Engineer, Product Manager, Data Scientist"
+                    value={role}
+                    onChange={(e) => setRole(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Question Type</label>
+                  <Select value={questionType} onValueChange={setQuestionType}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="behavioral">Behavioral</SelectItem>
+                      <SelectItem value="technical">Technical</SelectItem>
+                      <SelectItem value="situational">Situational</SelectItem>
+                      <SelectItem value="mixed">Mixed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button 
+                  onClick={generateQuestions} 
+                  disabled={isGenerating}
+                  className="w-full"
+                >
+                  {isGenerating ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Generating {selectedCompany ? `${getSelectedCompanyInfo()?.name} ` : ''}Questions...
+                    </>
+                  ) : (
+                    <>
+                      <Play className="mr-2 h-4 w-4" />
+                      Start {selectedCompany ? `${getSelectedCompanyInfo()?.name} ` : ''}Interview
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
         ) : (
           <div className="grid gap-6 lg:grid-cols-3">
             {/* Progress sidebar */}
@@ -275,14 +345,28 @@ const MockInterview = () => {
 
             {/* Main interview area */}
             <div className="lg:col-span-2 space-y-4">
+              {selectedCompany && (
+                <div className={`p-4 rounded-lg bg-gradient-to-r ${getSelectedCompanyInfo()?.color} text-white flex items-center gap-3`}>
+                  <span className="text-2xl">{getSelectedCompanyInfo()?.logo}</span>
+                  <div>
+                    <p className="font-semibold">{getSelectedCompanyInfo()?.name} Interview Prep</p>
+                    <p className="text-sm opacity-90">Questions tailored to {getSelectedCompanyInfo()?.name}'s culture and values</p>
+                  </div>
+                </div>
+              )}
               <Card>
                 <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <Badge variant="outline">{questions[currentIndex]?.type}</Badge>
                       <Badge className={getDifficultyColor(questions[currentIndex]?.difficulty)}>
                         {questions[currentIndex]?.difficulty}
                       </Badge>
+                      {questions[currentIndex]?.companyFocus && (
+                        <Badge variant="secondary" className="bg-primary/10 text-primary">
+                          {questions[currentIndex]?.companyFocus}
+                        </Badge>
+                      )}
                     </div>
                     <span className="text-sm text-muted-foreground">
                       Question {currentIndex + 1} of {questions.length}
