@@ -34,12 +34,34 @@ interface Question {
 }
 
 const COMPANIES = [
+  // FAANG / MAANG
   { id: 'google', name: 'Google', color: 'from-blue-500 to-green-500', logo: '🔍' },
   { id: 'amazon', name: 'Amazon', color: 'from-orange-500 to-yellow-500', logo: '📦' },
   { id: 'microsoft', name: 'Microsoft', color: 'from-blue-600 to-cyan-500', logo: '💻' },
   { id: 'meta', name: 'Meta', color: 'from-blue-500 to-purple-500', logo: '👥' },
   { id: 'apple', name: 'Apple', color: 'from-gray-600 to-gray-400', logo: '🍎' },
   { id: 'netflix', name: 'Netflix', color: 'from-red-600 to-red-500', logo: '🎬' },
+  // Top Tech Companies
+  { id: 'stripe', name: 'Stripe', color: 'from-purple-600 to-indigo-600', logo: '💳' },
+  { id: 'airbnb', name: 'Airbnb', color: 'from-rose-500 to-pink-500', logo: '🏠' },
+  { id: 'uber', name: 'Uber', color: 'from-gray-900 to-gray-700', logo: '🚗' },
+  { id: 'linkedin', name: 'LinkedIn', color: 'from-blue-700 to-blue-500', logo: '💼' },
+  // Additional Popular Companies
+  { id: 'salesforce', name: 'Salesforce', color: 'from-blue-400 to-cyan-400', logo: '☁️' },
+  { id: 'adobe', name: 'Adobe', color: 'from-red-500 to-orange-500', logo: '🎨' },
+  { id: 'twitter', name: 'X (Twitter)', color: 'from-gray-900 to-gray-600', logo: '𝕏' },
+  { id: 'spotify', name: 'Spotify', color: 'from-green-500 to-green-400', logo: '🎵' },
+  { id: 'shopify', name: 'Shopify', color: 'from-green-600 to-lime-500', logo: '🛒' },
+  { id: 'nvidia', name: 'NVIDIA', color: 'from-green-600 to-green-500', logo: '🎮' },
+  // Indian Tech Giants
+  { id: 'tcs', name: 'TCS', color: 'from-blue-800 to-blue-600', logo: '🏢' },
+  { id: 'infosys', name: 'Infosys', color: 'from-blue-600 to-indigo-500', logo: '🏛️' },
+  { id: 'wipro', name: 'Wipro', color: 'from-purple-700 to-purple-500', logo: '🌐' },
+  { id: 'flipkart', name: 'Flipkart', color: 'from-yellow-500 to-blue-500', logo: '🛍️' },
+  { id: 'paytm', name: 'Paytm', color: 'from-blue-500 to-cyan-400', logo: '💰' },
+  { id: 'zomato', name: 'Zomato', color: 'from-red-500 to-red-400', logo: '🍽️' },
+  { id: 'swiggy', name: 'Swiggy', color: 'from-orange-500 to-orange-400', logo: '🍔' },
+  { id: 'razorpay', name: 'Razorpay', color: 'from-blue-600 to-blue-400', logo: '💳' },
 ];
 
 interface Feedback {
@@ -194,7 +216,7 @@ const MockInterview = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
                   {COMPANIES.map((company) => (
                     <button
                       key={company.id}

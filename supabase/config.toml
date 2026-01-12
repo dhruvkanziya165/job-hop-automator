@@ -41,3 +41,6 @@ verify_jwt = false
 
 [functions.mock-interview]
 verify_jwt = false
+
+[functions.seed-india-jobs]
+verify_jwt = false
