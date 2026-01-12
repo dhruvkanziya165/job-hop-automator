@@ -22,6 +22,7 @@ import { CircularProgress } from "./CircularProgress";
 import { JobDetailsModal } from "./JobDetailsModal";
 import { BulkApplyModal } from "./BulkApplyModal";
 import { BulkSelectBar } from "./BulkSelectBar";
+import JobScrapeControls from "./JobScrapeControls";
 
 // Helper function to clean markdown links and extract text
 const cleanMarkdownText = (text: string): string => {
@@ -398,7 +399,10 @@ const JobListings = () => {
 
   if (filteredJobs.length === 0 && !loading) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-6">
+        {/* Job Scrape Controls */}
+        <JobScrapeControls onJobsUpdated={fetchJobs} />
+        
         <div className="flex items-center justify-between">
           <h2 className="text-2xl font-bold">Matched Jobs</h2>
         </div>
@@ -409,7 +413,7 @@ const JobListings = () => {
           <Briefcase className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
           <h3 className="text-lg font-semibold mb-2">No jobs found</h3>
           <p className="text-muted-foreground mb-4">
-            Try adjusting your filters or click "Scrape 100+ Jobs Now" to find new opportunities
+            Use the controls above to add 1000+ India-focused jobs instantly!
           </p>
         </Card>
       </div>
@@ -418,6 +422,9 @@ const JobListings = () => {
 
   return (
     <div className="space-y-6">
+      {/* Job Scrape Controls */}
+      <JobScrapeControls onJobsUpdated={fetchJobs} />
+      
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
