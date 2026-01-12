@@ -356,6 +356,48 @@ export type Database = {
         }
         Relationships: []
       }
+      job_scrape_logs: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          error_message: string | null
+          id: string
+          jobs_found: number | null
+          jobs_inserted: number | null
+          keywords: string[] | null
+          locations: string[] | null
+          scrape_type: string
+          started_at: string
+          status: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          jobs_found?: number | null
+          jobs_inserted?: number | null
+          keywords?: string[] | null
+          locations?: string[] | null
+          scrape_type?: string
+          started_at?: string
+          status?: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          jobs_found?: number | null
+          jobs_inserted?: number | null
+          keywords?: string[] | null
+          locations?: string[] | null
+          scrape_type?: string
+          started_at?: string
+          status?: string
+        }
+        Relationships: []
+      }
       networking_contacts: {
         Row: {
           company: string | null
