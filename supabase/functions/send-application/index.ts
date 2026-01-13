@@ -7,16 +7,101 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Input validation
+const validateEmail = (email: string): boolean => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email) && email.length <= 255;
+};
+
+const validateUUID = (id: string): boolean => {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(id);
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { jobId, userId, subject, body, toEmail, resumeId } = await req.json();
-    console.log(`Sending application for job ${jobId} to ${toEmail}`);
+    // Authentication check
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      console.error("No authorization header provided");
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     const supabase = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? ""
+    );
+
+    // Verify user token
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
+    if (authError || !user) {
+      console.error("Authentication failed:", authError);
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const { jobId, userId, subject, body, toEmail, resumeId } = await req.json();
+    
+    // Validate inputs
+    if (!jobId || !validateUUID(jobId)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid job ID" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
+    if (!userId || !validateUUID(userId)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid user ID" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Verify the authenticated user matches the userId in request
+    if (user.id !== userId) {
+      console.error("User ID mismatch: authenticated user", user.id, "vs requested", userId);
+      return new Response(
+        JSON.stringify({ error: "Forbidden: Cannot apply on behalf of another user" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!toEmail || !validateEmail(toEmail)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid email address" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!subject || subject.length > 200) {
+      return new Response(
+        JSON.stringify({ error: "Subject is required and must be under 200 characters" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!body || body.length > 10000) {
+      return new Response(
+        JSON.stringify({ error: "Body is required and must be under 10000 characters" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log(`Sending application for job ${jobId} to ${toEmail} by user ${user.id}`);
+
+    // Create service role client for database operations
+    const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
@@ -24,7 +109,7 @@ serve(async (req) => {
     const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
     // Fetch user profile for sender info
-    const { data: profile, error: profileError } = await supabase
+    const { data: profile, error: profileError } = await supabaseAdmin
       .from("profiles")
       .select("*")
       .eq("id", userId)
@@ -35,7 +120,7 @@ serve(async (req) => {
     }
 
     // Fetch job details
-    const { data: job, error: jobError } = await supabase
+    const { data: job, error: jobError } = await supabaseAdmin
       .from("job_postings")
       .select("*")
       .eq("id", jobId)
@@ -47,16 +132,17 @@ serve(async (req) => {
 
     // Fetch resume if provided
     let resumeAttachment = null;
-    if (resumeId) {
-      const { data: resume } = await supabase
+    if (resumeId && validateUUID(resumeId)) {
+      const { data: resume } = await supabaseAdmin
         .from("resumes")
         .select("*")
         .eq("id", resumeId)
+        .eq("user_id", userId) // Ensure resume belongs to the user
         .single();
 
       if (resume) {
         // Get resume file from storage
-        const { data: fileData } = await supabase.storage
+        const { data: fileData } = await supabaseAdmin.storage
           .from("resumes")
           .download(resume.file_path);
 
@@ -103,7 +189,7 @@ serve(async (req) => {
     console.log("Email sent successfully:", emailResponse);
 
     // Create or update application record
-    const { data: existingApp } = await supabase
+    const { data: existingApp } = await supabaseAdmin
       .from("applications")
       .select("*")
       .eq("user_id", userId)
@@ -112,7 +198,7 @@ serve(async (req) => {
 
     if (existingApp) {
       // Update existing application
-      const { error: updateError } = await supabase
+      const { error: updateError } = await supabaseAdmin
         .from("applications")
         .update({
           status: "applied",
@@ -126,7 +212,7 @@ serve(async (req) => {
       }
     } else {
       // Create new application
-      const { error: insertError } = await supabase
+      const { error: insertError } = await supabaseAdmin
         .from("applications")
         .insert({
           user_id: userId,
