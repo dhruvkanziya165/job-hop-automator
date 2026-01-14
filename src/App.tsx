@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
+import ProfileSetup from "./pages/ProfileSetup";
 import Analytics from "./pages/Analytics";
 import ApplicationTracker from "./pages/ApplicationTracker";
 import ApplicationStats from "./pages/ApplicationStats";
@@ -30,6 +31,7 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/profile" element={<ProfileSetup />} />
           <Route path="/analytics" element={<Analytics />} />
           <Route path="/applications" element={<ApplicationTracker />} />
           <Route path="/stats" element={<ApplicationStats />} />
