@@ -13,10 +13,14 @@ import {
   FileText, 
   CheckCircle, 
   ArrowLeft,
-  Briefcase
+  Briefcase,
+  Settings,
+  Mail
 } from "lucide-react";
 import ProfileForm from "@/components/profile/ProfileForm";
 import ResumeUpload from "@/components/profile/ResumeUpload";
+import JobPreferences from "@/components/profile/JobPreferences";
+import CoverLetterTemplates from "@/components/profile/CoverLetterTemplates";
 
 interface Profile {
   id: string;
@@ -43,6 +47,7 @@ const ProfileSetup = () => {
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [resumes, setResumes] = useState<Resume[]>([]);
+  const [coverTemplateCount, setCoverTemplateCount] = useState(0);
   const [activeTab, setActiveTab] = useState("profile");
   const navigate = useNavigate();
 
@@ -64,6 +69,15 @@ const ProfileSetup = () => {
       .order("created_at", { ascending: false });
     
     if (data) setResumes(data);
+  };
+
+  const fetchCoverTemplates = async (userId: string) => {
+    const { count } = await supabase
+      .from("cover_templates")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", userId);
+    
+    setCoverTemplateCount(count || 0);
   };
 
   useEffect(() => {
@@ -92,7 +106,8 @@ const ProfileSetup = () => {
       setTimeout(async () => {
         await Promise.all([
           fetchProfile(session.user.id),
-          fetchResumes(session.user.id)
+          fetchResumes(session.user.id),
+          fetchCoverTemplates(session.user.id)
         ]);
         setLoading(false);
       }, 0);
@@ -105,9 +120,10 @@ const ProfileSetup = () => {
 
   const calculateProgress = () => {
     let progress = 0;
-    if (profile?.full_name) progress += 25;
-    if (profile?.phone || profile?.linkedin_url) progress += 25;
-    if (resumes.length > 0) progress += 50;
+    if (profile?.full_name) progress += 20;
+    if (profile?.phone || profile?.linkedin_url) progress += 20;
+    if (resumes.length > 0) progress += 40;
+    if (coverTemplateCount > 0) progress += 20;
     return progress;
   };
 
@@ -166,28 +182,32 @@ const ProfileSetup = () => {
           </div>
           <Progress value={progress} className="h-2" />
           
-          <div className="grid grid-cols-3 gap-4 mt-6">
-            <div className={`flex items-center gap-2 ${profile?.full_name ? "text-success" : "text-muted-foreground"}`}>
-              <CheckCircle className={`h-5 w-5 ${profile?.full_name ? "fill-success" : ""}`} />
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+            <div className={`flex items-center gap-2 ${profile?.full_name ? "text-green-600" : "text-muted-foreground"}`}>
+              <CheckCircle className={`h-5 w-5 ${profile?.full_name ? "text-green-500" : ""}`} />
               <span className="text-sm">Basic Info</span>
             </div>
-            <div className={`flex items-center gap-2 ${(profile?.phone || profile?.linkedin_url) ? "text-success" : "text-muted-foreground"}`}>
-              <CheckCircle className={`h-5 w-5 ${(profile?.phone || profile?.linkedin_url) ? "fill-success" : ""}`} />
+            <div className={`flex items-center gap-2 ${(profile?.phone || profile?.linkedin_url) ? "text-green-600" : "text-muted-foreground"}`}>
+              <CheckCircle className={`h-5 w-5 ${(profile?.phone || profile?.linkedin_url) ? "text-green-500" : ""}`} />
               <span className="text-sm">Contact Details</span>
             </div>
-            <div className={`flex items-center gap-2 ${resumes.length > 0 ? "text-success" : "text-muted-foreground"}`}>
-              <CheckCircle className={`h-5 w-5 ${resumes.length > 0 ? "fill-success" : ""}`} />
+            <div className={`flex items-center gap-2 ${resumes.length > 0 ? "text-green-600" : "text-muted-foreground"}`}>
+              <CheckCircle className={`h-5 w-5 ${resumes.length > 0 ? "text-green-500" : ""}`} />
               <span className="text-sm">Resume Uploaded</span>
+            </div>
+            <div className={`flex items-center gap-2 ${coverTemplateCount > 0 ? "text-green-600" : "text-muted-foreground"}`}>
+              <CheckCircle className={`h-5 w-5 ${coverTemplateCount > 0 ? "text-green-500" : ""}`} />
+              <span className="text-sm">Cover Letter</span>
             </div>
           </div>
         </Card>
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="mb-6">
+          <TabsList className="mb-6 flex-wrap h-auto gap-2">
             <TabsTrigger value="profile" className="gap-2">
               <UserIcon className="h-4 w-4" />
-              Profile Information
+              Profile
             </TabsTrigger>
             <TabsTrigger value="resumes" className="gap-2">
               <FileText className="h-4 w-4" />
@@ -195,6 +215,19 @@ const ProfileSetup = () => {
               {resumes.length > 0 && (
                 <span className="ml-1 bg-primary/20 text-primary text-xs px-2 py-0.5 rounded-full">
                   {resumes.length}
+                </span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="preferences" className="gap-2">
+              <Settings className="h-4 w-4" />
+              Job Preferences
+            </TabsTrigger>
+            <TabsTrigger value="cover-letters" className="gap-2">
+              <Mail className="h-4 w-4" />
+              Cover Letters
+              {coverTemplateCount > 0 && (
+                <span className="ml-1 bg-primary/20 text-primary text-xs px-2 py-0.5 rounded-full">
+                  {coverTemplateCount}
                 </span>
               )}
             </TabsTrigger>
@@ -214,6 +247,14 @@ const ProfileSetup = () => {
               resumes={resumes} 
               onResumesChange={() => fetchResumes(user?.id || "")}
             />
+          </TabsContent>
+
+          <TabsContent value="preferences">
+            <JobPreferences userId={user?.id || ""} />
+          </TabsContent>
+
+          <TabsContent value="cover-letters">
+            <CoverLetterTemplates userId={user?.id || ""} />
           </TabsContent>
         </Tabs>
       </main>
