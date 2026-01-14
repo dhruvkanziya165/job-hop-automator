@@ -99,9 +99,9 @@ const DashboardLayout = ({ children, automationContent }: DashboardLayoutProps) 
                 <Mic className="h-4 w-4 mr-2" />
                 Practice
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => navigate("/settings")}>
-                <Settings className="h-4 w-4 mr-2" />
-                Settings
+              <Button variant="ghost" size="sm" onClick={() => navigate("/profile")}>
+                <User className="h-4 w-4 mr-2" />
+                Profile
               </Button>
             </nav>
 
