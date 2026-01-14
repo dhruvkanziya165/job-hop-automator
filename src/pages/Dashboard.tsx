@@ -8,6 +8,7 @@ import DashboardStats from "@/components/dashboard/DashboardStats";
 import JobListings from "@/components/dashboard/JobListings";
 import OnboardingFlow from "@/components/dashboard/OnboardingFlow";
 import { AutomationControls } from "@/components/dashboard/AutomationControls";
+import { ProfileCompletionReminder } from "@/components/dashboard/ProfileCompletionReminder";
 
 const Dashboard = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -73,6 +74,9 @@ const Dashboard = () => {
   return (
     <DashboardLayout automationContent={<AutomationControls />}>
       <div className="space-y-6">
+        {/* Profile Completion Reminder */}
+        {user && <ProfileCompletionReminder userId={user.id} />}
+        
         <DashboardStats />
         <JobListings />
       </div>
