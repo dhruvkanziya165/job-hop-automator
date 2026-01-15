@@ -1,9 +1,14 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+// Input validation constants
+const MAX_FIELD_LENGTH = 500;
+const MAX_CONTEXT_LENGTH = 2000;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -11,22 +16,103 @@ serve(async (req) => {
   }
 
   try {
+    // Authentication check
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      console.error("No authorization header provided");
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? ""
+    );
+
+    // Verify user token
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
+    if (authError || !user) {
+      console.error("Authentication failed:", authError);
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const { currentOffer, desiredSalary, role, company, context } = await req.json();
-    console.log(`Generating negotiation script for ${role} at ${company}`);
+    
+    // Input validation
+    if (!currentOffer || typeof currentOffer !== 'string') {
+      return new Response(
+        JSON.stringify({ error: "Current offer is required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!desiredSalary || typeof desiredSalary !== 'string') {
+      return new Response(
+        JSON.stringify({ error: "Desired salary is required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!role || typeof role !== 'string') {
+      return new Response(
+        JSON.stringify({ error: "Role is required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!company || typeof company !== 'string') {
+      return new Response(
+        JSON.stringify({ error: "Company is required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Validate lengths
+    if (currentOffer.length > MAX_FIELD_LENGTH || desiredSalary.length > MAX_FIELD_LENGTH ||
+        role.length > MAX_FIELD_LENGTH || company.length > MAX_FIELD_LENGTH) {
+      return new Response(
+        JSON.stringify({ error: `Input fields must be under ${MAX_FIELD_LENGTH} characters` }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (context && typeof context === 'string' && context.length > MAX_CONTEXT_LENGTH) {
+      return new Response(
+        JSON.stringify({ error: `Context must be under ${MAX_CONTEXT_LENGTH} characters` }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log(`User ${user.id} generating negotiation script for ${role} at ${company}`);
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
+    // Sanitize inputs for AI prompt
+    const sanitizedCompany = company.substring(0, MAX_FIELD_LENGTH).replace(/[<>{}]/g, '');
+    const sanitizedRole = role.substring(0, MAX_FIELD_LENGTH).replace(/[<>{}]/g, '');
+    const sanitizedCurrentOffer = currentOffer.substring(0, MAX_FIELD_LENGTH).replace(/[<>{}]/g, '');
+    const sanitizedDesiredSalary = desiredSalary.substring(0, MAX_FIELD_LENGTH).replace(/[<>{}]/g, '');
+    const sanitizedContext = context ? 
+      String(context).substring(0, MAX_CONTEXT_LENGTH).replace(/[<>{}]/g, '') : 'None provided';
+
     const prompt = `You are a career coach and salary negotiation expert. Generate a comprehensive negotiation strategy and scripts.
 
 Current Offer Details:
-- Company: ${company}
-- Role: ${role}
-- Current Offer: ${currentOffer}
-- Desired Salary: ${desiredSalary}
-- Additional Context: ${context || "None provided"}
+- Company: ${sanitizedCompany}
+- Role: ${sanitizedRole}
+- Current Offer: ${sanitizedCurrentOffer}
+- Desired Salary: ${sanitizedDesiredSalary}
+- Additional Context: ${sanitizedContext}
 
 Provide a JSON response with:
 1. "opening_script": A professional opening statement to initiate negotiation (2-3 sentences)
@@ -77,7 +163,7 @@ Provide a JSON response with:
     content = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
     
     const negotiationData = JSON.parse(content);
-    console.log("Negotiation script generated successfully");
+    console.log("Negotiation script generated successfully for user:", user.id);
 
     return new Response(
       JSON.stringify({

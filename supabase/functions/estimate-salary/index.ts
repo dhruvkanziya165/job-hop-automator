@@ -6,26 +6,132 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Input validation
+const validateUUID = (id: string): boolean => {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(id);
+};
+
+const MAX_ROLE_LENGTH = 200;
+const MAX_LOCATION_LENGTH = 200;
+const MAX_SKILLS = 50;
+const MAX_SKILL_LENGTH = 100;
+const MAX_EXPERIENCE_YEARS = 70;
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    // Authentication check
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      console.error("No authorization header provided");
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? ""
+    );
+
+    // Verify user token
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
+    if (authError || !user) {
+      console.error("Authentication failed:", authError);
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const { role, experienceYears, location, skills, userId } = await req.json();
-    console.log(`Estimating salary for ${role} with ${experienceYears} years in ${location}`);
+    
+    // Validate userId if provided - must match authenticated user
+    if (userId) {
+      if (!validateUUID(userId)) {
+        return new Response(
+          JSON.stringify({ error: "Invalid user ID" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      if (user.id !== userId) {
+        console.error("User ID mismatch: authenticated user", user.id, "vs requested", userId);
+        return new Response(
+          JSON.stringify({ error: "Forbidden: Cannot estimate salary for another user" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
+    // Input validation
+    if (!role || typeof role !== 'string') {
+      return new Response(
+        JSON.stringify({ error: "Role is required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (role.length > MAX_ROLE_LENGTH) {
+      return new Response(
+        JSON.stringify({ error: `Role must be under ${MAX_ROLE_LENGTH} characters` }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!location || typeof location !== 'string') {
+      return new Response(
+        JSON.stringify({ error: "Location is required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (location.length > MAX_LOCATION_LENGTH) {
+      return new Response(
+        JSON.stringify({ error: `Location must be under ${MAX_LOCATION_LENGTH} characters` }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Validate experience years
+    const validatedExperience = typeof experienceYears === 'number' && 
+      experienceYears >= 0 && experienceYears <= MAX_EXPERIENCE_YEARS 
+        ? Math.floor(experienceYears) 
+        : 0;
+
+    // Validate skills array
+    let validatedSkills: string[] = [];
+    if (skills && Array.isArray(skills)) {
+      validatedSkills = skills
+        .filter((s): s is string => typeof s === 'string' && s.length > 0)
+        .slice(0, MAX_SKILLS)
+        .map(s => s.substring(0, MAX_SKILL_LENGTH));
+    }
+
+    console.log(`User ${user.id} estimating salary for ${role} with ${validatedExperience} years in ${location}`);
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
+    // Sanitize inputs for AI prompt
+    const sanitizedRole = role.substring(0, MAX_ROLE_LENGTH).replace(/[<>{}]/g, '');
+    const sanitizedLocation = location.substring(0, MAX_LOCATION_LENGTH).replace(/[<>{}]/g, '');
+    const sanitizedSkills = validatedSkills.join(", ");
+
     const prompt = `You are a salary analysis expert. Provide salary estimates for the following position:
 
-Role: ${role}
-Experience: ${experienceYears} years
-Location: ${location}
-Skills: ${skills?.join(", ") || "Not specified"}
+Role: ${sanitizedRole}
+Experience: ${validatedExperience} years
+Location: ${sanitizedLocation}
+Skills: ${sanitizedSkills || "Not specified"}
 
 Respond with a JSON object containing:
 - estimated_min: minimum salary in the local currency (number only)
@@ -76,28 +182,26 @@ Provide realistic, data-driven estimates.`;
     content = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
     
     const salaryData = JSON.parse(content);
-    console.log("Salary estimate generated:", salaryData);
+    console.log("Salary estimate generated for user:", user.id);
 
-    // Save to database if userId provided
-    if (userId) {
-      const supabase = createClient(
-        Deno.env.get("SUPABASE_URL") ?? "",
-        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-      );
+    // Save to database using the authenticated user's ID
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+    );
 
-      await supabase.from("salary_estimates").insert({
-        user_id: userId,
-        role,
-        experience_years: experienceYears,
-        location,
-        skills,
-        estimated_min: salaryData.estimated_min,
-        estimated_max: salaryData.estimated_max,
-        estimated_median: salaryData.estimated_median,
-        market_trend: salaryData.market_trend,
-        negotiation_tips: salaryData.negotiation_tips,
-      });
-    }
+    await supabaseAdmin.from("salary_estimates").insert({
+      user_id: user.id, // Always use authenticated user's ID
+      role: sanitizedRole,
+      experience_years: validatedExperience,
+      location: sanitizedLocation,
+      skills: validatedSkills,
+      estimated_min: salaryData.estimated_min,
+      estimated_max: salaryData.estimated_max,
+      estimated_median: salaryData.estimated_median,
+      market_trend: salaryData.market_trend,
+      negotiation_tips: salaryData.negotiation_tips,
+    });
 
     return new Response(
       JSON.stringify({

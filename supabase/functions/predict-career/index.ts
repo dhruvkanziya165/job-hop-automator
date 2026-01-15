@@ -6,30 +6,119 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Input validation
+const validateUUID = (id: string): boolean => {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(id);
+};
+
+const MAX_ROLE_LENGTH = 200;
+const MAX_SKILLS = 50;
+const MAX_SKILL_LENGTH = 100;
+const MAX_EXPERIENCE_YEARS = 70;
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    // Authentication check
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      console.error("No authorization header provided");
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? ""
+    );
+
+    // Verify user token
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
+    if (authError || !user) {
+      console.error("Authentication failed:", authError);
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const { userId, currentRole, skills, experienceYears } = await req.json();
-    console.log(`Predicting career path for: ${currentRole} with ${experienceYears} years experience`);
+    
+    // Validate userId if provided - must match authenticated user
+    if (userId) {
+      if (!validateUUID(userId)) {
+        return new Response(
+          JSON.stringify({ error: "Invalid user ID" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      if (user.id !== userId) {
+        console.error("User ID mismatch: authenticated user", user.id, "vs requested", userId);
+        return new Response(
+          JSON.stringify({ error: "Forbidden: Cannot predict career for another user" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
+    // Input validation
+    if (!currentRole || typeof currentRole !== 'string') {
+      return new Response(
+        JSON.stringify({ error: "Current role is required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (currentRole.length > MAX_ROLE_LENGTH) {
+      return new Response(
+        JSON.stringify({ error: `Current role must be under ${MAX_ROLE_LENGTH} characters` }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Validate skills array
+    if (!skills || !Array.isArray(skills)) {
+      return new Response(
+        JSON.stringify({ error: "Skills array is required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const validatedSkills = skills
+      .filter((s): s is string => typeof s === 'string' && s.length > 0)
+      .slice(0, MAX_SKILLS)
+      .map(s => s.substring(0, MAX_SKILL_LENGTH));
+
+    // Validate experience years
+    const validatedExperience = typeof experienceYears === 'number' && 
+      experienceYears >= 0 && experienceYears <= MAX_EXPERIENCE_YEARS 
+        ? Math.floor(experienceYears) 
+        : 0;
+
+    console.log(`User ${user.id} predicting career path for: ${currentRole} with ${validatedExperience} years experience`);
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
+    // Sanitize inputs for AI prompt
+    const sanitizedRole = currentRole.substring(0, MAX_ROLE_LENGTH).replace(/[<>{}]/g, '');
+    const sanitizedSkills = validatedSkills.join(", ");
 
     const prompt = `You are a career advisor. Analyze the career trajectory for someone with the following profile:
 
-Current Role: ${currentRole}
-Years of Experience: ${experienceYears}
-Current Skills: ${skills.join(", ")}
+Current Role: ${sanitizedRole}
+Years of Experience: ${validatedExperience}
+Current Skills: ${sanitizedSkills}
 
 Provide a comprehensive career path prediction with:
 
@@ -116,8 +205,8 @@ Only return valid JSON, no markdown or extra text.`;
             path_name: "Career Growth Path",
             description: "Natural progression in your field",
             roles: [
-              { title: currentRole, years_from_now: 0, required_skills: skills.slice(0, 3), description: "Current position" },
-              { title: "Senior " + currentRole, years_from_now: 2, required_skills: ["Leadership", "Strategy"], description: "Advanced role" }
+              { title: sanitizedRole, years_from_now: 0, required_skills: validatedSkills.slice(0, 3), description: "Current position" },
+              { title: "Senior " + sanitizedRole, years_from_now: 2, required_skills: ["Leadership", "Strategy"], description: "Advanced role" }
             ],
             success_probability: "high",
             effort_required: "medium"
@@ -127,19 +216,24 @@ Only return valid JSON, no markdown or extra text.`;
           { trend: "Growing Demand", impact: "positive", description: "Industry shows consistent growth", timeframe: "medium-term" }
         ],
         salary_progression: [
-          { years_experience: experienceYears, role: currentRole, min_salary: 50000, max_salary: 80000, median_salary: 65000 }
+          { years_experience: validatedExperience, role: sanitizedRole, min_salary: 50000, max_salary: 80000, median_salary: 65000 }
         ]
       };
     }
 
-    // Save to database
-    const { error: insertError } = await supabase
+    // Save to database using authenticated user's ID
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+    );
+
+    const { error: insertError } = await supabaseAdmin
       .from("career_path_predictions")
       .insert({
-        user_id: userId,
-        role_title: currentRole,
-        skills: skills,
-        experience_years: experienceYears,
+        user_id: user.id, // Always use authenticated user's ID
+        role_title: sanitizedRole,
+        skills: validatedSkills,
+        experience_years: validatedExperience,
         predicted_paths: prediction.predicted_paths,
         industry_insights: prediction.industry_insights,
         salary_progression: prediction.salary_progression,
@@ -148,6 +242,8 @@ Only return valid JSON, no markdown or extra text.`;
     if (insertError) {
       console.error("Error saving prediction:", insertError);
     }
+
+    console.log("Career prediction completed for user:", user.id);
 
     return new Response(JSON.stringify(prediction), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

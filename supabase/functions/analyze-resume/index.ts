@@ -1,9 +1,15 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// Input validation constants
+const MAX_RESUME_LENGTH = 50000;
+const MAX_JOB_DESCRIPTION_LENGTH = 20000;
+const VALID_ANALYSIS_TYPES = ['ats', 'keywords', 'tailor', 'comprehensive'];
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -11,19 +17,76 @@ serve(async (req) => {
   }
 
   try {
-    const { resumeText, jobDescription, analysisType } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    // Authentication check
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      console.error("No authorization header provided");
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? ""
+    );
+
+    // Verify user token
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
+    if (authError || !user) {
+      console.error("Authentication failed:", authError);
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const { resumeText, jobDescription, analysisType } = await req.json();
+    
+    // Input validation
+    if (!resumeText || typeof resumeText !== 'string') {
+      return new Response(
+        JSON.stringify({ error: "Resume text is required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (resumeText.length > MAX_RESUME_LENGTH) {
+      return new Response(
+        JSON.stringify({ error: `Resume text must be under ${MAX_RESUME_LENGTH} characters` }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (jobDescription && typeof jobDescription === 'string' && jobDescription.length > MAX_JOB_DESCRIPTION_LENGTH) {
+      return new Response(
+        JSON.stringify({ error: `Job description must be under ${MAX_JOB_DESCRIPTION_LENGTH} characters` }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Validate analysis type
+    const validatedAnalysisType = VALID_ANALYSIS_TYPES.includes(analysisType) ? analysisType : 'comprehensive';
+
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    console.log("Analyzing resume with type:", analysisType);
+    console.log(`User ${user.id} analyzing resume with type: ${validatedAnalysisType}`);
+
+    // Sanitize inputs for AI prompt (escape special characters that could be used for prompt injection)
+    const sanitizedResume = resumeText.substring(0, MAX_RESUME_LENGTH).replace(/[<>{}]/g, '');
+    const sanitizedJobDescription = jobDescription ? 
+      String(jobDescription).substring(0, MAX_JOB_DESCRIPTION_LENGTH).replace(/[<>{}]/g, '') : '';
 
     let systemPrompt = "";
     let userPrompt = "";
 
-    if (analysisType === "ats") {
+    if (validatedAnalysisType === "ats") {
       systemPrompt = `You are an expert ATS (Applicant Tracking System) analyzer. Analyze resumes for ATS compatibility and provide detailed scoring.`;
       userPrompt = `Analyze this resume for ATS compatibility and provide:
 1. An ATS score from 0-100
@@ -32,9 +95,9 @@ serve(async (req) => {
 4. Keyword optimization suggestions
 
 Resume:
-${resumeText}
+${sanitizedResume}
 
-${jobDescription ? `Target Job Description:\n${jobDescription}` : ''}
+${sanitizedJobDescription ? `Target Job Description:\n${sanitizedJobDescription}` : ''}
 
 Respond in JSON format:
 {
@@ -44,7 +107,7 @@ Respond in JSON format:
   "keywordSuggestions": ["string array of keywords to add"],
   "overallFeedback": "string summary"
 }`;
-    } else if (analysisType === "keywords") {
+    } else if (validatedAnalysisType === "keywords") {
       systemPrompt = `You are an expert resume keyword optimizer. Analyze resumes against job descriptions to identify keyword gaps.`;
       userPrompt = `Compare this resume against the job description and identify:
 1. Matching keywords found in the resume
@@ -52,10 +115,10 @@ Respond in JSON format:
 3. Suggestions for incorporating missing keywords naturally
 
 Resume:
-${resumeText}
+${sanitizedResume}
 
 Job Description:
-${jobDescription}
+${sanitizedJobDescription}
 
 Respond in JSON format:
 {
@@ -65,7 +128,7 @@ Respond in JSON format:
   "suggestions": ["array of suggestions for adding keywords"],
   "priorityKeywords": ["top 5 most important keywords to add"]
 }`;
-    } else if (analysisType === "tailor") {
+    } else if (validatedAnalysisType === "tailor") {
       systemPrompt = `You are an expert resume writer who tailors resumes for specific job applications while maintaining authenticity.`;
       userPrompt = `Tailor this resume for the specific job description. Rewrite sections to:
 1. Highlight relevant experience
@@ -74,10 +137,10 @@ Respond in JSON format:
 4. Optimize for both ATS and human readers
 
 Original Resume:
-${resumeText}
+${sanitizedResume}
 
 Target Job Description:
-${jobDescription}
+${sanitizedJobDescription}
 
 Respond in JSON format:
 {
@@ -96,9 +159,9 @@ Respond in JSON format:
 5. Professional recommendations
 
 Resume:
-${resumeText}
+${sanitizedResume}
 
-${jobDescription ? `Target Job Description:\n${jobDescription}` : ''}
+${sanitizedJobDescription ? `Target Job Description:\n${sanitizedJobDescription}` : ''}
 
 Respond in JSON format:
 {
@@ -149,11 +212,11 @@ Respond in JSON format:
       parsedContent = { error: "Failed to parse response", raw: content };
     }
 
-    console.log("Resume analysis completed successfully");
+    console.log("Resume analysis completed successfully for user:", user.id);
 
     return new Response(JSON.stringify({ 
       success: true, 
-      analysisType,
+      analysisType: validatedAnalysisType,
       result: parsedContent 
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
