@@ -6,28 +6,110 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Input validation
+const validateUUID = (id: string): boolean => {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(id);
+};
+
+const MAX_TARGET_ROLE_LENGTH = 200;
+const MAX_SKILLS = 50;
+const MAX_SKILL_LENGTH = 100;
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    // Authentication check
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      console.error("No authorization header provided");
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? ""
+    );
+
+    // Verify user token
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
+    if (authError || !user) {
+      console.error("Authentication failed:", authError);
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const { userId, targetRole, currentSkills } = await req.json();
-    console.log(`Analyzing skill gap for role: ${targetRole}`);
+    
+    // Validate userId if provided - must match authenticated user
+    if (userId) {
+      if (!validateUUID(userId)) {
+        return new Response(
+          JSON.stringify({ error: "Invalid user ID" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      if (user.id !== userId) {
+        console.error("User ID mismatch: authenticated user", user.id, "vs requested", userId);
+        return new Response(
+          JSON.stringify({ error: "Forbidden: Cannot analyze skills for another user" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
+    // Input validation
+    if (!targetRole || typeof targetRole !== 'string') {
+      return new Response(
+        JSON.stringify({ error: "Target role is required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (targetRole.length > MAX_TARGET_ROLE_LENGTH) {
+      return new Response(
+        JSON.stringify({ error: `Target role must be under ${MAX_TARGET_ROLE_LENGTH} characters` }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Validate currentSkills array
+    if (!currentSkills || !Array.isArray(currentSkills)) {
+      return new Response(
+        JSON.stringify({ error: "Current skills array is required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const validatedSkills = currentSkills
+      .filter((s): s is string => typeof s === 'string' && s.length > 0)
+      .slice(0, MAX_SKILLS)
+      .map(s => s.substring(0, MAX_SKILL_LENGTH));
+
+    console.log(`User ${user.id} analyzing skill gap for role: ${targetRole}`);
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
+    // Sanitize inputs for AI prompt
+    const sanitizedTargetRole = targetRole.substring(0, MAX_TARGET_ROLE_LENGTH).replace(/[<>{}]/g, '');
+    const sanitizedSkills = validatedSkills.join(", ");
 
-    const prompt = `You are a career advisor and skills analyst. Analyze the skill gap for someone targeting a "${targetRole}" role.
+    const prompt = `You are a career advisor and skills analyst. Analyze the skill gap for someone targeting a "${sanitizedTargetRole}" role.
 
-Current skills: ${currentSkills.join(", ")}
+Current skills: ${sanitizedSkills}
 
 Provide a comprehensive skill gap analysis with:
 
@@ -103,13 +185,18 @@ Only return valid JSON, no markdown or extra text.`;
       };
     }
 
-    // Save to database
-    const { error: insertError } = await supabase
+    // Save to database using authenticated user's ID
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+    );
+
+    const { error: insertError } = await supabaseAdmin
       .from("skill_gap_analyses")
       .insert({
-        user_id: userId,
-        target_role: targetRole,
-        current_skills: currentSkills,
+        user_id: user.id, // Always use authenticated user's ID
+        target_role: sanitizedTargetRole,
+        current_skills: validatedSkills,
         missing_skills: analysis.missing_skills,
         learning_roadmap: analysis.learning_roadmap,
         course_recommendations: analysis.course_recommendations,
@@ -119,6 +206,8 @@ Only return valid JSON, no markdown or extra text.`;
     if (insertError) {
       console.error("Error saving analysis:", insertError);
     }
+
+    console.log("Skill gap analysis completed for user:", user.id);
 
     return new Response(JSON.stringify(analysis), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

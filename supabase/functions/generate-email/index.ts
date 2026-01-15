@@ -6,22 +6,86 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Input validation
+const validateUUID = (id: string): boolean => {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(id);
+};
+
+const VALID_EMAIL_TYPES = ['application', 'followup'];
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { jobId, userId, emailType = "application" } = await req.json();
-    console.log(`Generating ${emailType} email for job ${jobId} and user ${userId}`);
+    // Authentication check
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      console.error("No authorization header provided");
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     const supabase = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? ""
+    );
+
+    // Verify user token
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
+    if (authError || !user) {
+      console.error("Authentication failed:", authError);
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const { jobId, userId, emailType = "application" } = await req.json();
+    
+    // Input validation
+    if (!jobId || !validateUUID(jobId)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid job ID" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!userId || !validateUUID(userId)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid user ID" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Verify the authenticated user matches the userId in request
+    if (user.id !== userId) {
+      console.error("User ID mismatch: authenticated user", user.id, "vs requested", userId);
+      return new Response(
+        JSON.stringify({ error: "Forbidden: Cannot generate email for another user" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Validate email type
+    const validatedEmailType = VALID_EMAIL_TYPES.includes(emailType) ? emailType : 'application';
+
+    console.log(`User ${user.id} generating ${validatedEmailType} email for job ${jobId}`);
+
+    // Create service role client for database operations
+    const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
     // Fetch job details
-    const { data: job, error: jobError } = await supabase
+    const { data: job, error: jobError } = await supabaseAdmin
       .from("job_postings")
       .select("*")
       .eq("id", jobId)
@@ -32,7 +96,7 @@ serve(async (req) => {
     }
 
     // Fetch user profile
-    const { data: profile, error: profileError } = await supabase
+    const { data: profile, error: profileError } = await supabaseAdmin
       .from("profiles")
       .select("*")
       .eq("id", userId)
@@ -43,7 +107,7 @@ serve(async (req) => {
     }
 
     // Fetch user preferences for context
-    const { data: preferences } = await supabase
+    const { data: preferences } = await supabaseAdmin
       .from("user_preferences")
       .select("*")
       .eq("user_id", userId)
@@ -64,25 +128,33 @@ Generate a compelling email that:
 - Ends with a clear call to action
 - Uses a professional but friendly tone`;
 
-    const userPrompt = emailType === "application" 
+    // Sanitize inputs for AI prompt
+    const sanitizedJobTitle = String(job.title).substring(0, 200).replace(/[<>{}]/g, '');
+    const sanitizedCompany = String(job.company).substring(0, 200).replace(/[<>{}]/g, '');
+    const sanitizedLocation = job.location ? String(job.location).substring(0, 200).replace(/[<>{}]/g, '') : '';
+    const sanitizedDescription = job.description ? String(job.description).substring(0, 2000).replace(/[<>{}]/g, '') : '';
+    const sanitizedName = profile.full_name ? String(profile.full_name).substring(0, 100).replace(/[<>{}]/g, '') : 'Applicant';
+    const sanitizedSkills = preferences?.keywords ? 
+      (Array.isArray(preferences.keywords) ? preferences.keywords.slice(0, 10).join(", ") : "N/A") : "N/A";
+
+    const userPrompt = validatedEmailType === "application" 
       ? `Generate a cold email for this job application:
 
-Job Title: ${job.title}
-Company: ${job.company}
-Location: ${job.location}
-Description: ${job.description}
+Job Title: ${sanitizedJobTitle}
+Company: ${sanitizedCompany}
+Location: ${sanitizedLocation}
+Description: ${sanitizedDescription}
 
 Applicant Info:
-Name: ${profile.full_name || "Applicant"}
-Skills: ${preferences?.keywords?.join(", ") || "N/A"}
-LinkedIn: ${profile.linkedin_url || "N/A"}
+Name: ${sanitizedName}
+Skills: ${sanitizedSkills}
 
 Write the email body only (no subject line). Make it personalized and compelling.`
       : `Generate a follow-up email for this job application:
 
-Job Title: ${job.title}
-Company: ${job.company}
-Applicant: ${profile.full_name || "Applicant"}
+Job Title: ${sanitizedJobTitle}
+Company: ${sanitizedCompany}
+Applicant: ${sanitizedName}
 
 Write a brief follow-up email (under 100 words) checking on the application status.`;
 
@@ -117,11 +189,11 @@ Write a brief follow-up email (under 100 words) checking on the application stat
     const emailBody = aiData.choices[0].message.content;
 
     // Generate subject line
-    const subjectLine = emailType === "application"
-      ? `Application for ${job.title} - ${profile.full_name || "Applicant"}`
-      : `Following up on ${job.title} application - ${profile.full_name || "Applicant"}`;
+    const subjectLine = validatedEmailType === "application"
+      ? `Application for ${sanitizedJobTitle} - ${sanitizedName}`
+      : `Following up on ${sanitizedJobTitle} application - ${sanitizedName}`;
 
-    console.log("Email generated successfully");
+    console.log("Email generated successfully for user:", user.id);
 
     return new Response(
       JSON.stringify({
