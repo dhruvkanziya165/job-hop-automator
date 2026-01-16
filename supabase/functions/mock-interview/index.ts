@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { checkRateLimit, rateLimitResponse } from "../_shared/rate-limiter.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -9,6 +10,10 @@ const corsHeaders = {
 const VALID_ACTIONS = ['generate_questions', 'evaluate_answer'];
 const VALID_QUESTION_TYPES = ['behavioral', 'technical', 'situational'];
 const MAX_TEXT_LENGTH = 2000;
+
+// Rate limit: 15 requests per minute per user
+const RATE_LIMIT_MAX = 15;
+const RATE_LIMIT_WINDOW_MS = 60000;
 
 const COMPANY_INFO: Record<string, { culture: string; values: string[]; interviewStyle: string; famousQuestions: string[] }> = {
   google: { culture: "Innovation-driven, data-oriented", values: ["Focus on the user", "Think 10x"], interviewStyle: "Heavy coding/algorithms focus", famousQuestions: ["Design YouTube's recommendation system"] },
@@ -39,6 +44,18 @@ serve(async (req) => {
     if (authError || !user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), 
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // Apply rate limiting
+    const rateLimitResult = checkRateLimit({
+      maxRequests: RATE_LIMIT_MAX,
+      windowMs: RATE_LIMIT_WINDOW_MS,
+      identifier: `mock-interview:${user.id}`,
+    });
+
+    if (!rateLimitResult.allowed) {
+      console.log(`Rate limit exceeded for user ${user.id}`);
+      return rateLimitResponse(corsHeaders, rateLimitResult.resetIn);
     }
 
     const { action, role, question, answer, questionType, company } = await req.json();
