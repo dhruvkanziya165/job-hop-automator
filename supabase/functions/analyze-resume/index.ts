@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { checkRateLimit, rateLimitResponse } from "../_shared/rate-limiter.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -10,6 +11,10 @@ const corsHeaders = {
 const MAX_RESUME_LENGTH = 50000;
 const MAX_JOB_DESCRIPTION_LENGTH = 20000;
 const VALID_ANALYSIS_TYPES = ['ats', 'keywords', 'tailor', 'comprehensive'];
+
+// Rate limit: 10 requests per minute per user
+const RATE_LIMIT_MAX = 10;
+const RATE_LIMIT_WINDOW_MS = 60000;
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -42,6 +47,18 @@ serve(async (req) => {
         JSON.stringify({ error: "Unauthorized" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    // Apply rate limiting
+    const rateLimitResult = checkRateLimit({
+      maxRequests: RATE_LIMIT_MAX,
+      windowMs: RATE_LIMIT_WINDOW_MS,
+      identifier: `analyze-resume:${user.id}`,
+    });
+
+    if (!rateLimitResult.allowed) {
+      console.log(`Rate limit exceeded for user ${user.id}`);
+      return rateLimitResponse(corsHeaders, rateLimitResult.resetIn);
     }
 
     const { resumeText, jobDescription, analysisType } = await req.json();

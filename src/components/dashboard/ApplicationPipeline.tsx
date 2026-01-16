@@ -8,7 +8,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { 
   Building2, 
   MapPin, 
-  Clock, 
   Edit, 
   Trash2, 
   ExternalLink,
@@ -16,10 +15,10 @@ import {
   GripVertical,
   Calendar,
   FileText,
-  Mail
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { InterviewScheduleModal } from "./InterviewScheduleModal";
 
 interface Application {
   id: string;
@@ -57,8 +56,17 @@ export const ApplicationPipeline = ({ applications, onUpdate }: ApplicationPipel
   const [editNotes, setEditNotes] = useState("");
   const [editStatus, setEditStatus] = useState("");
   const [draggedApp, setDraggedApp] = useState<string | null>(null);
+  const [interviewModalOpen, setInterviewModalOpen] = useState(false);
+  const [pendingInterviewApp, setPendingInterviewApp] = useState<Application | null>(null);
 
-  const handleUpdateStatus = async (appId: string, newStatus: string) => {
+  const handleUpdateStatus = async (appId: string, newStatus: string, skipInterviewPrompt = false) => {
+    const app = applications.find(a => a.id === appId);
+    
+    // If moving to interview stage, prompt to schedule
+    if (newStatus === "interview" && !skipInterviewPrompt && app) {
+      setPendingInterviewApp(app);
+      setInterviewModalOpen(true);
+    }
     const updates: Record<string, unknown> = { status: newStatus };
     
     if (newStatus === "applied") {
@@ -133,9 +141,19 @@ export const ApplicationPipeline = ({ applications, onUpdate }: ApplicationPipel
   const handleDrop = async (e: React.DragEvent, targetStatus: string) => {
     e.preventDefault();
     if (draggedApp) {
-      await handleUpdateStatus(draggedApp, targetStatus);
+      const app = applications.find(a => a.id === draggedApp);
+      if (targetStatus === "interview" && app) {
+        setPendingInterviewApp(app);
+        setInterviewModalOpen(true);
+      }
+      await handleUpdateStatus(draggedApp, targetStatus, targetStatus === "interview");
       setDraggedApp(null);
     }
+  };
+
+  const handleInterviewScheduled = () => {
+    setPendingInterviewApp(null);
+    onUpdate();
   };
 
   const getApplicationsByStatus = (status: string) => {
@@ -369,6 +387,21 @@ export const ApplicationPipeline = ({ applications, onUpdate }: ApplicationPipel
           );
         })}
       </div>
+
+      {/* Interview Schedule Modal */}
+      {pendingInterviewApp && (
+        <InterviewScheduleModal
+          open={interviewModalOpen}
+          onOpenChange={(open) => {
+            setInterviewModalOpen(open);
+            if (!open) setPendingInterviewApp(null);
+          }}
+          applicationId={pendingInterviewApp.id}
+          jobTitle={pendingInterviewApp.job_postings.title}
+          company={pendingInterviewApp.job_postings.company}
+          onScheduled={handleInterviewScheduled}
+        />
+      )}
     </div>
   );
 };

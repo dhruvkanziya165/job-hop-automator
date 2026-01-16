@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { checkRateLimit, rateLimitResponse } from "../_shared/rate-limiter.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,6 +14,10 @@ const validateUUID = (id: string): boolean => {
 };
 
 const VALID_EMAIL_TYPES = ['application', 'followup'];
+
+// Rate limit: 15 requests per minute per user
+const RATE_LIMIT_MAX = 15;
+const RATE_LIMIT_WINDOW_MS = 60000;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -45,6 +50,18 @@ serve(async (req) => {
         JSON.stringify({ error: "Unauthorized" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    // Apply rate limiting
+    const rateLimitResult = checkRateLimit({
+      maxRequests: RATE_LIMIT_MAX,
+      windowMs: RATE_LIMIT_WINDOW_MS,
+      identifier: `generate-email:${user.id}`,
+    });
+
+    if (!rateLimitResult.allowed) {
+      console.log(`Rate limit exceeded for user ${user.id}`);
+      return rateLimitResponse(corsHeaders, rateLimitResult.resetIn);
     }
 
     const { jobId, userId, emailType = "application" } = await req.json();
