@@ -85,6 +85,12 @@ export const InterviewScheduleModal = ({
     }
 
     toast.success("Interview scheduled successfully!");
+
+    // Send scheduled notification email
+    supabase.functions.invoke("send-interview-reminder", {
+      body: { interviewId: undefined, type: "scheduled" },
+    }).catch(() => { /* non-critical */ });
+
     onOpenChange(false);
     onScheduled();
     resetForm();
