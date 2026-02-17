@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { InterviewPrepChecklist } from "./InterviewPrepChecklist";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -210,6 +211,11 @@ export const UpcomingInterviews = () => {
                   </div>
 
                   <div className="flex items-center gap-1 shrink-0">
+                    <InterviewPrepChecklist
+                      interviewId={interview.id}
+                      jobTitle={interview.applications?.job_postings?.title || "Interview"}
+                      company={interview.applications?.job_postings?.company || "Company"}
+                    />
                     {interview.meeting_link && (
                       <Button
                         variant="ghost"
