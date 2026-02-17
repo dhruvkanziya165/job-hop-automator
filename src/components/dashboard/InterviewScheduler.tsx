@@ -23,7 +23,8 @@ import {
   Trash2, 
   Bell,
   ExternalLink,
-  Loader2
+  Loader2,
+  Download
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -565,6 +566,50 @@ export const InterviewScheduler = () => {
                             Join
                           </Button>
                         )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          title="Add to Google Calendar"
+                          onClick={async () => {
+                            try {
+                              const { data, error } = await supabase.functions.invoke("generate-calendar-event", {
+                                body: { interviewId: interview.id },
+                              });
+                              if (error) throw error;
+                              if (data?.googleCalendarUrl) window.open(data.googleCalendarUrl, "_blank");
+                            } catch {
+                              toast.error("Failed to add to calendar");
+                            }
+                          }}
+                        >
+                          <CalendarIcon className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          title="Download .ics file"
+                          onClick={async () => {
+                            try {
+                              const { data, error } = await supabase.functions.invoke("generate-calendar-event", {
+                                body: { interviewId: interview.id },
+                              });
+                              if (error) throw error;
+                              if (data?.icsContent) {
+                                const blob = new Blob([data.icsContent], { type: "text/calendar" });
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement("a");
+                                a.href = url;
+                                a.download = `interview-${interview.id.slice(0, 8)}.ics`;
+                                a.click();
+                                URL.revokeObjectURL(url);
+                              }
+                            } catch {
+                              toast.error("Failed to download calendar file");
+                            }
+                          }}
+                        >
+                          <Download className="h-4 w-4" />
+                        </Button>
                         <Button
                           variant="outline"
                           size="sm"
