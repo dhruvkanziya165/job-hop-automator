@@ -189,6 +189,62 @@ export type Database = {
           },
         ]
       }
+      interview_feedback: {
+        Row: {
+          could_improve: string | null
+          created_at: string
+          difficulty_rating: number
+          id: string
+          interview_id: string
+          notes: string | null
+          outcome: string | null
+          overall_rating: number
+          questions_asked: string | null
+          updated_at: string
+          user_id: string
+          went_well: string | null
+          would_recommend: boolean | null
+        }
+        Insert: {
+          could_improve?: string | null
+          created_at?: string
+          difficulty_rating: number
+          id?: string
+          interview_id: string
+          notes?: string | null
+          outcome?: string | null
+          overall_rating: number
+          questions_asked?: string | null
+          updated_at?: string
+          user_id: string
+          went_well?: string | null
+          would_recommend?: boolean | null
+        }
+        Update: {
+          could_improve?: string | null
+          created_at?: string
+          difficulty_rating?: number
+          id?: string
+          interview_id?: string
+          notes?: string | null
+          outcome?: string | null
+          overall_rating?: number
+          questions_asked?: string | null
+          updated_at?: string
+          user_id?: string
+          went_well?: string | null
+          would_recommend?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "interview_feedback_interview_id_fkey"
+            columns: ["interview_id"]
+            isOneToOne: false
+            referencedRelation: "interviews"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       interviews: {
         Row: {
           application_id: string | null
