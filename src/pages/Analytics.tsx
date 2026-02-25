@@ -11,6 +11,7 @@ import { ApplicationTrendsChart } from "@/components/analytics/ApplicationTrends
 import { StatusDistributionChart } from "@/components/analytics/StatusDistributionChart";
 import { CompanyPerformanceChart } from "@/components/analytics/CompanyPerformanceChart";
 import { WeeklyActivityChart } from "@/components/analytics/WeeklyActivityChart";
+import { InterviewFeedbackCharts } from "@/components/analytics/InterviewFeedbackCharts";
 import { toast } from "sonner";
 
 const Analytics = () => {
@@ -96,6 +97,12 @@ const Analytics = () => {
         </div>
 
         <CompanyPerformanceChart applications={analyticsData?.applications || []} />
+
+        {/* Interview Feedback Analytics */}
+        <div>
+          <h2 className="text-xl font-semibold mb-4">Interview Feedback Analytics</h2>
+          <InterviewFeedbackCharts />
+        </div>
 
         <Tabs defaultValue="success" className="space-y-4">
           <TabsList>
