@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { InterviewPrepChecklist } from "./InterviewPrepChecklist";
+import { InterviewFeedbackModal } from "./InterviewFeedbackModal";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -182,7 +183,7 @@ export const UpcomingInterviews = () => {
                     : "bg-muted/30 border-border"
                 }`}
               >
-                <div className="flex items-start justify-between gap-3">
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 sm:gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <TypeIcon className="h-4 w-4 text-primary shrink-0" />
@@ -210,8 +211,13 @@ export const UpcomingInterviews = () => {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1 shrink-0">
+                  <div className="flex items-center gap-1 shrink-0 flex-wrap justify-end">
                     <InterviewPrepChecklist
+                      interviewId={interview.id}
+                      jobTitle={interview.applications?.job_postings?.title || "Interview"}
+                      company={interview.applications?.job_postings?.company || "Company"}
+                    />
+                    <InterviewFeedbackModal
                       interviewId={interview.id}
                       jobTitle={interview.applications?.job_postings?.title || "Interview"}
                       company={interview.applications?.job_postings?.company || "Company"}
