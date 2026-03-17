@@ -213,35 +213,48 @@ Applicant: ${sanitizedName}
 
 Write a brief follow-up email (under 100 words) checking on the application status.`;
 
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-      }),
-    });
+    let emailBody = "";
 
-    if (!aiResponse.ok) {
-      if (aiResponse.status === 429) {
-        throw new Error("Rate limits exceeded, please try again later.");
+    try {
+      const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash-lite",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+        }),
+      });
+
+      if (!aiResponse.ok) {
+        const errorText = await aiResponse.text();
+        console.error("AI gateway error:", aiResponse.status, errorText);
+
+        if (aiResponse.status !== 429 && aiResponse.status !== 402) {
+          throw new Error("AI gateway error");
+        }
+      } else {
+        const aiData = await aiResponse.json();
+        emailBody = aiData?.choices?.[0]?.message?.content?.trim() ?? "";
       }
-      if (aiResponse.status === 402) {
-        throw new Error("Payment required, please add funds to your Lovable AI workspace.");
-      }
-      const errorText = await aiResponse.text();
-      console.error("AI gateway error:", aiResponse.status, errorText);
-      throw new Error("AI gateway error");
+    } catch (aiError) {
+      console.error("AI generation failed, using fallback email:", aiError);
     }
 
-    const aiData = await aiResponse.json();
-    const emailBody = aiData.choices[0].message.content;
+    if (!emailBody) {
+      emailBody = buildFallbackEmail({
+        emailType: validatedEmailType,
+        jobTitle: sanitizedJobTitle,
+        company: sanitizedCompany,
+        applicantName: sanitizedName,
+        skills: sanitizedSkills,
+      });
+    }
 
     // Generate subject line
     const subjectLine = validatedEmailType === "application"
