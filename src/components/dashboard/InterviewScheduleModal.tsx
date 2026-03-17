@@ -63,7 +63,7 @@ export const InterviewScheduleModal = ({
     const scheduledAt = new Date(formData.scheduled_at);
     scheduledAt.setHours(hours, minutes, 0, 0);
 
-    const { error } = await supabase.from("interviews").insert({
+    const { data: newInterview, error } = await supabase.from("interviews").insert({
       user_id: user.id,
       application_id: applicationId,
       interview_type: formData.interview_type,
@@ -74,7 +74,7 @@ export const InterviewScheduleModal = ({
       interviewer_name: formData.interviewer_name || null,
       interviewer_email: formData.interviewer_email || null,
       notes: formData.notes || null,
-    });
+    }).select("id").single();
 
     setSaving(false);
 
@@ -87,9 +87,11 @@ export const InterviewScheduleModal = ({
     toast.success("Interview scheduled successfully!");
 
     // Send scheduled notification email
-    supabase.functions.invoke("send-interview-reminder", {
-      body: { interviewId: undefined, type: "scheduled" },
-    }).catch(() => { /* non-critical */ });
+    if (newInterview?.id) {
+      supabase.functions.invoke("send-interview-reminder", {
+        body: { interviewId: newInterview.id, type: "scheduled" },
+      }).catch(() => { /* non-critical */ });
+    }
 
     onOpenChange(false);
     onScheduled();
