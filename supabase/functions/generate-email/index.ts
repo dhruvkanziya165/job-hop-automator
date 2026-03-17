@@ -19,6 +19,44 @@ const VALID_EMAIL_TYPES = ['application', 'followup'];
 const RATE_LIMIT_MAX = 15;
 const RATE_LIMIT_WINDOW_MS = 60000;
 
+const buildFallbackEmail = ({
+  emailType,
+  jobTitle,
+  company,
+  applicantName,
+  skills,
+}: {
+  emailType: string;
+  jobTitle: string;
+  company: string;
+  applicantName: string;
+  skills: string;
+}): string => {
+  const topSkills = skills !== 'N/A'
+    ? skills.split(',').map((skill) => skill.trim()).filter(Boolean).slice(0, 3).join(', ')
+    : '';
+
+  if (emailType === 'followup') {
+    return `Hi ${company} hiring team,
+
+I wanted to follow up on my application for the ${jobTitle} role. I'm still very interested in the opportunity and would love to learn about any updates on the hiring process.
+
+Please let me know if I can share any additional information.
+
+Best regards,
+${applicantName}`;
+  }
+
+  return `Hi ${company} hiring team,
+
+I'm reaching out to express my interest in the ${jobTitle} role. My background includes experience with ${topSkills || 'modern web technologies'}, and I enjoy building reliable, user-focused solutions that create real impact.
+
+I'd welcome the chance to discuss how my skills could support your team. Thank you for your time and consideration.
+
+Best regards,
+${applicantName}`;
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -175,35 +213,48 @@ Applicant: ${sanitizedName}
 
 Write a brief follow-up email (under 100 words) checking on the application status.`;
 
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-      }),
-    });
+    let emailBody = "";
 
-    if (!aiResponse.ok) {
-      if (aiResponse.status === 429) {
-        throw new Error("Rate limits exceeded, please try again later.");
+    try {
+      const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash-lite",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+        }),
+      });
+
+      if (!aiResponse.ok) {
+        const errorText = await aiResponse.text();
+        console.error("AI gateway error:", aiResponse.status, errorText);
+
+        if (aiResponse.status !== 429 && aiResponse.status !== 402) {
+          throw new Error("AI gateway error");
+        }
+      } else {
+        const aiData = await aiResponse.json();
+        emailBody = aiData?.choices?.[0]?.message?.content?.trim() ?? "";
       }
-      if (aiResponse.status === 402) {
-        throw new Error("Payment required, please add funds to your Lovable AI workspace.");
-      }
-      const errorText = await aiResponse.text();
-      console.error("AI gateway error:", aiResponse.status, errorText);
-      throw new Error("AI gateway error");
+    } catch (aiError) {
+      console.error("AI generation failed, using fallback email:", aiError);
     }
 
-    const aiData = await aiResponse.json();
-    const emailBody = aiData.choices[0].message.content;
+    if (!emailBody) {
+      emailBody = buildFallbackEmail({
+        emailType: validatedEmailType,
+        jobTitle: sanitizedJobTitle,
+        company: sanitizedCompany,
+        applicantName: sanitizedName,
+        skills: sanitizedSkills,
+      });
+    }
 
     // Generate subject line
     const subjectLine = validatedEmailType === "application"
