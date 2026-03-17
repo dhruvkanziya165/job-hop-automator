@@ -96,7 +96,7 @@ Deno.serve(async (req) => {
     const notificationType = type || "reminder";
 
     // Generate email content using AI
-    const aiResponse = await fetch("https://api.lovable.dev/v1/chat/completions", {
+    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
