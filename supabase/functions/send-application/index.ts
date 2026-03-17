@@ -148,7 +148,12 @@ serve(async (req) => {
 
         if (fileData) {
           const arrayBuffer = await fileData.arrayBuffer();
-          const base64Content = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+          const bytes = new Uint8Array(arrayBuffer);
+          let binary = '';
+          for (let i = 0; i < bytes.length; i++) {
+            binary += String.fromCharCode(bytes[i]);
+          }
+          const base64Content = btoa(binary);
           resumeAttachment = {
             filename: resume.file_name,
             content: base64Content,
