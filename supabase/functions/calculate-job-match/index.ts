@@ -83,23 +83,35 @@ Return ONLY a JSON object with this exact structure (no markdown, no extra text)
   "reasons": ["reason1", "reason2", "reason3"]
 }`;
 
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${lovableApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          { role: 'system', content: 'You are a job matching expert. Always respond with valid JSON only.' },
-          { role: 'user', content: prompt }
-        ],
-      }),
-    });
+    let aiResponse: Response | null = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${lovableApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'google/gemini-2.5-flash',
+          messages: [
+            { role: 'system', content: 'You are a job matching expert. Always respond with valid JSON only.' },
+            { role: 'user', content: prompt }
+          ],
+        }),
+      });
 
-    if (!aiResponse.ok) {
-      console.error('AI API error:', aiResponse.status, await aiResponse.text());
+      if (aiResponse.ok) break;
+      
+      const errText = await aiResponse.text();
+      console.error(`AI API attempt ${attempt + 1} error:`, aiResponse.status, errText);
+      
+      if (aiResponse.status === 429 && attempt < 2) {
+        const delay = (attempt + 1) * 2000;
+        console.log(`Rate limited, retrying in ${delay}ms...`);
+        await new Promise(r => setTimeout(r, delay));
+        continue;
+      }
+      
       return new Response(JSON.stringify({ error: 'Failed to calculate match score' }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
