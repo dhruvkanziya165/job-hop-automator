@@ -58,9 +58,8 @@ serve(async (req) => {
       throw new Error("User preferences not found. Please complete onboarding first.");
     }
 
-    if (preferences.apply_mode !== "auto") {
-      throw new Error("Automation is not enabled. Enable auto-apply in preferences.");
-    }
+    // Allow manual trigger even if auto mode is off
+    console.log(`Apply mode: ${preferences.apply_mode}`);
 
     const dailyLimit = preferences.daily_apply_cap || 5;
     const today = new Date();
