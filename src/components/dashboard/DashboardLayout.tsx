@@ -8,7 +8,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { 
   Briefcase, LayoutDashboard, FileText, LogOut, User, Bot,
   BarChart3, PieChart, IndianRupee, FileCheck, Users, Target,
-  Compass, Calendar, Mic, Menu
+  Compass, Calendar, Mic, Menu, Brain
 } from "lucide-react";
 import { toast } from "sonner";
 
