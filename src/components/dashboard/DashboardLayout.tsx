@@ -8,7 +8,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { 
   Briefcase, LayoutDashboard, FileText, LogOut, User, Bot,
   BarChart3, PieChart, IndianRupee, FileCheck, Users, Target,
-  Compass, Calendar, Mic, Menu
+  Compass, Calendar, Mic, Menu, Brain
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -29,6 +29,7 @@ const navItems = [
   { path: "/career", icon: Compass, label: "Career" },
   { path: "/interviews", icon: Calendar, label: "Interviews" },
   { path: "/mock-interview", icon: Mic, label: "Practice" },
+  { path: "/ai-chat", icon: Brain, label: "AI Chat" },
   { path: "/profile", icon: User, label: "Profile" },
 ];
 

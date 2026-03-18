@@ -17,6 +17,7 @@ import SkillGapAnalysis from "./pages/SkillGapAnalysis";
 import CareerPathPredictor from "./pages/CareerPathPredictor";
 import InterviewCalendar from "./pages/InterviewCalendar";
 import MockInterview from "./pages/MockInterview";
+import AICareerChat from "./pages/AICareerChat";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -42,6 +43,7 @@ const App = () => (
           <Route path="/career" element={<CareerPathPredictor />} />
           <Route path="/interviews" element={<InterviewCalendar />} />
           <Route path="/mock-interview" element={<MockInterview />} />
+          <Route path="/ai-chat" element={<AICareerChat />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
