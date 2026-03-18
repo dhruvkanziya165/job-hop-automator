@@ -29,6 +29,7 @@ const navItems = [
   { path: "/career", icon: Compass, label: "Career" },
   { path: "/interviews", icon: Calendar, label: "Interviews" },
   { path: "/mock-interview", icon: Mic, label: "Practice" },
+  { path: "/ai-chat", icon: Brain, label: "AI Chat" },
   { path: "/profile", icon: User, label: "Profile" },
 ];
 

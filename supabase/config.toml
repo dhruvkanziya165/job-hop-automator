@@ -44,3 +44,6 @@ verify_jwt = false
 
 [functions.seed-india-jobs]
 verify_jwt = false
+
+[functions.career-chat]
+verify_jwt = false
