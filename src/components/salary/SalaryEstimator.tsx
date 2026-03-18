@@ -73,7 +73,8 @@ export const SalaryEstimator = () => {
     }
   };
 
-  const formatSalary = (amount: number, currency: string) => {
+  const formatSalary = (amount: number | undefined | null, currency: string) => {
+    if (amount == null) return "N/A";
     if (currency === "INR") {
       if (amount >= 100000) {
         return `₹${(amount / 100000).toFixed(1)} LPA`;
