@@ -17,6 +17,7 @@ import SkillGapAnalysis from "./pages/SkillGapAnalysis";
 import CareerPathPredictor from "./pages/CareerPathPredictor";
 import InterviewCalendar from "./pages/InterviewCalendar";
 import MockInterview from "./pages/MockInterview";
+import AICareerChat from "./pages/AICareerChat";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
