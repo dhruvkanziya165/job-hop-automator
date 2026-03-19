@@ -9,9 +9,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { 
-  Loader2, Play, RefreshCw, Mail, CheckCircle2, 
+  Loader2, RefreshCw, CheckCircle2, 
   Building2, MapPin, Calendar, ExternalLink, Clock,
-  Zap, TrendingUp, Send
+  Zap, Send, ShieldCheck, AlertTriangle
 } from "lucide-react";
 
 interface AppliedJob {
@@ -31,7 +31,6 @@ interface AppliedJob {
 
 export const AutomationControls = () => {
   const [isLoading, setIsLoading] = useState(false);
-  const [isAutoMode, setIsAutoMode] = useState(false);
   const [dailyCap, setDailyCap] = useState(5);
   const [isScraping, setIsScraping] = useState(false);
   const [appliedJobs, setAppliedJobs] = useState<AppliedJob[]>([]);
@@ -48,11 +47,10 @@ export const AutomationControls = () => {
     if (!user) return;
     const { data } = await supabase
       .from("user_preferences")
-      .select("apply_mode, daily_apply_cap")
+      .select("daily_apply_cap")
       .eq("user_id", user.id)
       .maybeSingle();
     if (data) {
-      setIsAutoMode(data.apply_mode === "auto");
       setDailyCap(data.daily_apply_cap || 5);
     }
   };
@@ -84,7 +82,7 @@ export const AutomationControls = () => {
     setLoadingApplied(false);
   };
 
-  const handleToggleAutoMode = async (enabled: boolean) => {
+  const handleSaveSettings = async () => {
     setIsLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -92,17 +90,12 @@ export const AutomationControls = () => {
 
       const { error } = await supabase
         .from("user_preferences")
-        .update({
-          apply_mode: enabled ? "auto" : "manual",
-          daily_apply_cap: dailyCap,
-        })
+        .update({ daily_apply_cap: dailyCap })
         .eq("user_id", user.id);
 
       if (error) throw error;
-      setIsAutoMode(enabled);
-      toast.success(`Auto-apply ${enabled ? "enabled" : "disabled"}`);
+      toast.success("Settings saved");
     } catch (error) {
-      console.error("Error toggling auto mode:", error);
       toast.error("Failed to update settings");
     } finally {
       setIsLoading(false);
@@ -142,48 +135,6 @@ export const AutomationControls = () => {
     }
   };
 
-  const handleRunAutomation = async () => {
-    setIsLoading(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
-
-      // Temporarily enable auto mode if not already
-      if (!isAutoMode) {
-        await supabase
-          .from("user_preferences")
-          .update({ apply_mode: "auto", daily_apply_cap: dailyCap })
-          .eq("user_id", user.id);
-      }
-
-      const { data, error } = await supabase.functions.invoke("automate-applications", {
-        body: { userId: user.id },
-      });
-
-      // Restore manual mode if it was off
-      if (!isAutoMode) {
-        await supabase
-          .from("user_preferences")
-          .update({ apply_mode: "manual" })
-          .eq("user_id", user.id);
-      }
-
-      if (error) throw error;
-
-      if (data.success) {
-        toast.success(data.message);
-        fetchAppliedJobs();
-      } else {
-        toast.error(data.message || "No new jobs to apply to");
-      }
-    } catch (error) {
-      console.error("Error running automation:", error);
-      toast.error("Automation failed: " + (error instanceof Error ? error.message : "Unknown error"));
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const getStatusColor = (status: string) => {
     switch (status) {
       case "applied": return "bg-blue-500/10 text-blue-700 border-blue-200";
@@ -199,12 +150,20 @@ export const AutomationControls = () => {
 
   return (
     <div className="space-y-6">
+      {/* Trust Banner */}
+      <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-green-500/5 border border-green-200 dark:border-green-800 text-sm text-green-700 dark:text-green-400">
+        <ShieldCheck className="h-4 w-4 shrink-0" />
+        <span>
+          <strong>Real applications only.</strong> We redirect you to actual job pages — no fake submissions ever.
+        </span>
+      </div>
+
       {/* Stats Row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
           <CardContent className="p-4 text-center">
             <div className="text-3xl font-bold text-primary">{appliedJobs.length}</div>
-            <p className="text-xs text-muted-foreground mt-1">Total Applied</p>
+            <p className="text-xs text-muted-foreground mt-1">Total Tracked</p>
           </CardContent>
         </Card>
         <Card className="bg-gradient-to-br from-green-500/10 to-green-500/5 border-green-200">
@@ -235,21 +194,11 @@ export const AutomationControls = () => {
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-lg">
               <Zap className="h-5 w-5 text-primary" />
-              Automation Settings
+              Application Settings
             </CardTitle>
-            <CardDescription>Configure auto-apply for job applications</CardDescription>
+            <CardDescription>Configure your daily application limits</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-              <Label htmlFor="auto-mode" className="font-medium">Auto-Apply Mode</Label>
-              <Switch
-                id="auto-mode"
-                checked={isAutoMode}
-                onCheckedChange={handleToggleAutoMode}
-                disabled={isLoading}
-              />
-            </div>
-
             <div className="space-y-2">
               <Label htmlFor="daily-cap">Daily Application Limit</Label>
               <Input
@@ -263,7 +212,7 @@ export const AutomationControls = () => {
             </div>
 
             <Button
-              onClick={() => handleToggleAutoMode(isAutoMode)}
+              onClick={handleSaveSettings}
               className="w-full"
               variant="outline"
               disabled={isLoading}
@@ -278,10 +227,10 @@ export const AutomationControls = () => {
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-lg">
               <Send className="h-5 w-5 text-secondary" />
-              Quick Actions
+              Job Discovery
             </CardTitle>
             <CardDescription>
-              Scrape 500+ jobs from 11 platforms & send AI-powered applications
+              Scrape 500+ jobs from 11 platforms to find opportunities
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -298,24 +247,12 @@ export const AutomationControls = () => {
               )}
             </Button>
 
-            <Button
-              onClick={handleRunAutomation}
-              className="w-full bg-gradient-to-r from-primary to-secondary text-primary-foreground hover:opacity-90"
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Mail className="mr-2 h-4 w-4" />
-              )}
-              Send Applications Now
-            </Button>
-
-            <p className="text-xs text-muted-foreground text-center">
-              {isAutoMode
-                ? "✅ Auto-apply is active. Sends applications automatically."
-                : "Manual mode — click above to send a batch now."}
-            </p>
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-muted/50 text-xs text-muted-foreground">
+              <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+              <span>
+                Jobs are fetched from real platforms. You'll apply on each company's own website — we track your progress automatically.
+              </span>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -327,9 +264,9 @@ export const AutomationControls = () => {
             <div>
               <CardTitle className="flex items-center gap-2 text-lg">
                 <CheckCircle2 className="h-5 w-5 text-green-500" />
-                Applied Jobs ({appliedJobs.length})
+                Tracked Applications ({appliedJobs.length})
               </CardTitle>
-              <CardDescription>Track all your submitted applications</CardDescription>
+              <CardDescription>All your application activity in one place</CardDescription>
             </div>
             <Button variant="ghost" size="sm" onClick={fetchAppliedJobs}>
               <RefreshCw className="h-4 w-4" />
@@ -343,9 +280,9 @@ export const AutomationControls = () => {
             </div>
           ) : appliedJobs.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              <Mail className="h-10 w-10 mx-auto mb-3 opacity-40" />
-              <p className="font-medium">No applications yet</p>
-              <p className="text-sm mt-1">Click "Send Applications Now" to start applying!</p>
+              <ShieldCheck className="h-10 w-10 mx-auto mb-3 opacity-40" />
+              <p className="font-medium">No applications tracked yet</p>
+              <p className="text-sm mt-1">Browse jobs and click "Apply Now" to get started!</p>
             </div>
           ) : (
             <ScrollArea className="h-[400px] pr-3">
@@ -361,7 +298,7 @@ export const AutomationControls = () => {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
                         <h4 className="font-semibold text-sm line-clamp-1">
-                          {app.job_postings.title}
+                          {app.job_postings?.title || "Unknown Position"}
                         </h4>
                         <Badge className={`text-[10px] shrink-0 ${getStatusColor(app.status)}`}>
                           {app.status}
@@ -370,9 +307,9 @@ export const AutomationControls = () => {
                       <div className="flex flex-wrap items-center gap-3 mt-1 text-xs text-muted-foreground">
                         <span className="flex items-center gap-1">
                           <Building2 className="h-3 w-3" />
-                          {app.job_postings.company}
+                          {app.job_postings?.company || "Unknown"}
                         </span>
-                        {app.job_postings.location && (
+                        {app.job_postings?.location && (
                           <span className="flex items-center gap-1">
                             <MapPin className="h-3 w-3" />
                             {app.job_postings.location}
@@ -391,7 +328,7 @@ export const AutomationControls = () => {
                       variant="ghost"
                       size="sm"
                       className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 p-0 shrink-0"
-                      onClick={() => window.open(app.job_postings.url, "_blank")}
+                      onClick={() => window.open(app.job_postings?.url, "_blank")}
                     >
                       <ExternalLink className="h-3.5 w-3.5" />
                     </Button>

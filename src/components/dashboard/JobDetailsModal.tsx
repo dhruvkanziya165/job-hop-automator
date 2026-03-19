@@ -2,9 +2,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Building2, MapPin, DollarSign, ExternalLink, Clock, Briefcase, CheckCircle2, Lightbulb } from "lucide-react";
+import { Building2, MapPin, DollarSign, ExternalLink, Clock, Briefcase, CheckCircle2, Lightbulb, ShieldCheck, AlertTriangle } from "lucide-react";
 import { CircularProgress } from "./CircularProgress";
-import { OneClickApply } from "./OneClickApply";
+import { classifyApplyType, cleanMarkdownText } from "@/lib/jobUtils";
 
 interface Job {
   id: string;
@@ -40,16 +40,7 @@ export const JobDetailsModal = ({
 }: JobDetailsModalProps) => {
   if (!job) return null;
 
-  const cleanMarkdownText = (text: string): string => {
-    if (!text) return "";
-    return text.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-      .replace(/[#*_]/g, '')
-      .trim();
-  };
-
-  const handleApplyComplete = () => {
-    onOpenChange(false);
-  };
+  const applyType = classifyApplyType(job.url);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -103,6 +94,35 @@ export const JobDetailsModal = ({
               Posted {new Date(job.posted_date).toLocaleDateString()}
             </Badge>
             <Badge variant="outline">{job.source}</Badge>
+            {/* Apply Type Badge */}
+            <Badge variant="outline" className={applyType.badgeColor}>
+              {applyType.label}
+            </Badge>
+          </div>
+
+          {/* Apply Type Notice */}
+          <div className={`rounded-lg p-4 border ${
+            applyType.type === "manual" 
+              ? "bg-amber-500/5 border-amber-200 dark:border-amber-800" 
+              : applyType.type === "unsupported"
+              ? "bg-destructive/5 border-destructive/20"
+              : "bg-green-500/5 border-green-200 dark:border-green-800"
+          }`}>
+            <div className="flex items-start gap-3">
+              {applyType.type === "manual" ? (
+                <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+              ) : applyType.type === "unsupported" ? (
+                <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+              ) : (
+                <ShieldCheck className="h-5 w-5 text-green-600 dark:text-green-400 shrink-0 mt-0.5" />
+              )}
+              <div>
+                <p className="text-sm font-medium">{applyType.description}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  We never fake submissions — your application is tracked honestly.
+                </p>
+              </div>
+            </div>
           </div>
 
           {/* Match Reasons */}
@@ -167,7 +187,15 @@ export const JobDetailsModal = ({
 
           {/* Actions */}
           <div className="flex gap-3 pt-4">
-            <OneClickApply job={job} onApplied={handleApplyComplete} />
+            <Button
+              onClick={() => onApply(job.id)}
+              disabled={applyType.type === "unsupported"}
+              className="flex-1 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
+              size="lg"
+            >
+              <ExternalLink className="h-4 w-4 mr-2" />
+              {applyType.type === "manual" ? "Open & Apply" : "Apply Now"}
+            </Button>
             <Button
               variant="outline"
               onClick={() => window.open(job.url, "_blank")}

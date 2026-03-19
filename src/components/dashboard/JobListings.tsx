@@ -12,26 +12,17 @@ import {
   Clock,
   Briefcase,
   Star,
-  Zap,
   Loader2,
-  Send
+  ShieldCheck,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 import JobFilters from "./JobFilters";
 import { CircularProgress } from "./CircularProgress";
 import { JobDetailsModal } from "./JobDetailsModal";
-import { BulkApplyModal } from "./BulkApplyModal";
 import { BulkSelectBar } from "./BulkSelectBar";
 import JobScrapeControls from "./JobScrapeControls";
-
-// Helper function to clean markdown links and extract text
-const cleanMarkdownText = (text: string): string => {
-  if (!text) return "";
-  // Remove markdown links [text](url) and keep only text
-  return text.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-    .replace(/[#*_]/g, '') // Remove other markdown symbols
-    .trim();
-};
+import { isValidJobUrl, classifyApplyType, cleanMarkdownText } from "@/lib/jobUtils";
 
 interface Job {
   id: string;
@@ -55,14 +46,14 @@ const JobListings = () => {
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [similarJobs, setSimilarJobs] = useState<Job[]>([]);
+  const [appliedJobIds, setAppliedJobIds] = useState<Set<string>>(new Set());
   
   // Bulk selection state
   const [selectedJobIds, setSelectedJobIds] = useState<Set<string>>(new Set());
-  const [bulkApplyModalOpen, setBulkApplyModalOpen] = useState(false);
-  const [applyingJobIds, setApplyingJobIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchJobs();
+    fetchAppliedJobIds();
   }, [filters.location, filters.jobType]);
 
   useEffect(() => {
@@ -75,38 +66,48 @@ const JobListings = () => {
     }
   }, [filteredJobs]);
 
+  const fetchAppliedJobIds = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    
+    const { data } = await supabase
+      .from("applications")
+      .select("job_id")
+      .eq("user_id", user.id);
+    
+    if (data) {
+      setAppliedJobIds(new Set(data.map(a => a.job_id)));
+    }
+  };
+
   const fetchJobs = async () => {
-    // Fetch ALL jobs first, we'll do smart filtering on client side
     let query = supabase
       .from("job_postings")
       .select("*");
     
-    // Apply job type filter
     if (filters.jobType && filters.jobType !== "both") {
       query = query.eq("job_type", filters.jobType);
     }
     
     const { data, error } = await query
       .order("fetched_at", { ascending: false })
-      .limit(2000); // Fetch more jobs for better filtering
+      .limit(2000);
 
     if (error) {
       toast.error("Failed to fetch jobs");
       return;
     }
 
-    // Smart location filtering on client side
-    let filteredData = data || [];
+    // Filter out jobs with invalid URLs
+    let filteredData = (data || []).filter(job => isValidJobUrl(job.url));
     
+    // Smart location filtering
     if (filters.location) {
       const searchLocation = filters.location.toLowerCase().trim();
-      
-      // Extract city and state from location (e.g., "Ahmedabad" or "Ahmedabad, Gujarat")
       const locationParts = searchLocation.split(',').map(p => p.trim());
       const city = locationParts[0];
       const state = locationParts[1] || '';
       
-      // Priority-based filtering
       const exactMatches: typeof filteredData = [];
       const stateMatches: typeof filteredData = [];
       const remoteMatches: typeof filteredData = [];
@@ -116,46 +117,33 @@ const JobListings = () => {
       filteredData.forEach(job => {
         const jobLocation = (job.location || '').toLowerCase();
         
-        // Priority 1: Exact city match
         if (jobLocation.includes(city)) {
           exactMatches.push(job);
-        }
-        // Priority 2: State match (for Indian cities)
-        else if (state && jobLocation.includes(state)) {
+        } else if (state && jobLocation.includes(state)) {
           stateMatches.push(job);
-        }
-        // Priority 3: Remote/WFH jobs (always relevant)
-        else if (
+        } else if (
           jobLocation.includes('remote') || 
           jobLocation.includes('wfh') || 
           jobLocation.includes('work from home') ||
           jobLocation.includes('anywhere')
         ) {
           remoteMatches.push(job);
-        }
-        // Priority 4: India-wide jobs (relevant for Indian cities)
-        else if (jobLocation.includes('india') || jobLocation.includes('pan india')) {
+        } else if (jobLocation.includes('india') || jobLocation.includes('pan india')) {
           indiaMatches.push(job);
-        }
-        // Priority 5: Other jobs
-        else {
+        } else {
           otherMatches.push(job);
         }
       });
       
-      // Combine in priority order
       filteredData = [
         ...exactMatches,
         ...stateMatches,
         ...remoteMatches,
         ...indiaMatches,
-        // Only include other matches if we have < 20 jobs total
         ...(exactMatches.length + stateMatches.length + remoteMatches.length + indiaMatches.length < 20 
           ? otherMatches.slice(0, 30) 
           : [])
       ];
-      
-      console.log(`Location filter "${filters.location}": ${exactMatches.length} exact, ${stateMatches.length} state, ${remoteMatches.length} remote, ${indiaMatches.length} India-wide`);
     }
 
     setJobs(filteredData);
@@ -164,70 +152,50 @@ const JobListings = () => {
 
   const parseSalaryRange = (salaryRange: string | null): { min: number; max: number } | null => {
     if (!salaryRange) return null;
-    
-    // Extract numbers from salary range text
     const numbers = salaryRange.match(/\d+/g);
     if (!numbers || numbers.length === 0) return null;
-    
     const values = numbers.map(n => parseInt(n));
     
-    // Handle different formats
     if (salaryRange.toLowerCase().includes('lpa') || salaryRange.toLowerCase().includes('lakh')) {
-      // Indian format (lakhs per annum) - convert to thousands
-      return {
-        min: values[0] * 100, // 1 lakh = 100k
-        max: values.length > 1 ? values[1] * 100 : values[0] * 100
-      };
+      return { min: values[0] * 100, max: values.length > 1 ? values[1] * 100 : values[0] * 100 };
     } else if (salaryRange.includes('$') || salaryRange.includes('USD')) {
-      // Convert USD to INR (approximate: 1 USD = 83 INR, then convert to thousands)
       return {
         min: Math.round((values[0] * 83) / 1000),
         max: values.length > 1 ? Math.round((values[1] * 83) / 1000) : Math.round((values[0] * 83) / 1000)
       };
     } else if (salaryRange.includes('k') || salaryRange.includes('K')) {
-      // Already in thousands - check if it's USD and convert
       const isUSD = salaryRange.includes('$');
       if (isUSD) {
         return {
-          min: Math.round((values[0] * 1000 * 83) / 1000), // Convert to INR thousands
+          min: Math.round((values[0] * 1000 * 83) / 1000),
           max: values.length > 1 ? Math.round((values[1] * 1000 * 83) / 1000) : Math.round((values[0] * 1000 * 83) / 1000)
         };
       }
-      return {
-        min: values[0],
-        max: values.length > 1 ? values[1] : values[0]
-      };
+      return { min: values[0], max: values.length > 1 ? values[1] : values[0] };
     } else {
-      // Assume it's in thousands if no unit specified
-      return {
-        min: values[0],
-        max: values.length > 1 ? values[1] : values[0]
-      };
+      return { min: values[0], max: values.length > 1 ? values[1] : values[0] };
     }
   };
 
   const filterJobsBySalaryAndKeywords = () => {
     let filtered = jobs;
 
-    // Filter by salary
+    // Exclude already-applied jobs
+    filtered = filtered.filter(job => !appliedJobIds.has(job.id));
+
     if (filters.salaryMin !== undefined || filters.salaryMax !== undefined) {
       filtered = filtered.filter(job => {
         const salaryRange = parseSalaryRange(job.salary_range);
-        if (!salaryRange) return true; // Include jobs without salary info
-        
+        if (!salaryRange) return true;
         const filterMin = filters.salaryMin || 0;
         const filterMax = filters.salaryMax || Infinity;
-        
-        // Job matches if its salary range overlaps with filter range
         return salaryRange.max >= filterMin && salaryRange.min <= filterMax;
       });
     }
 
-    // Filter by keywords
     if (filters.keywords && filters.keywords.length > 0) {
       filtered = filtered.filter(job => {
         const searchText = `${job.title} ${job.description} ${job.company}`.toLowerCase();
-        // Job matches if it contains ANY of the keywords
         return filters.keywords!.some(keyword => searchText.includes(keyword.toLowerCase()));
       });
     }
@@ -239,7 +207,6 @@ const JobListings = () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
 
-    // Fetch scores for first 10 jobs only to avoid rate limits
     const jobsToScore = filteredJobs.slice(0, 10);
     
     for (const job of jobsToScore) {
@@ -247,7 +214,6 @@ const JobListings = () => {
         const { data, error } = await supabase.functions.invoke('calculate-job-match', {
           body: { jobId: job.id }
         });
-
         if (!error && data) {
           setMatchScores(prev => ({ ...prev, [job.id]: data }));
         }
@@ -259,8 +225,6 @@ const JobListings = () => {
 
   const handleJobClick = (job: Job) => {
     setSelectedJob(job);
-    
-    // Find similar jobs (same job type, similar location or company)
     const similar = filteredJobs
       .filter(j => 
         j.id !== job.id && 
@@ -269,94 +233,58 @@ const JobListings = () => {
          j.location?.toLowerCase().includes(job.location?.toLowerCase().split(',')[0] || ''))
       )
       .slice(0, 5);
-    
     setSimilarJobs(similar);
     setModalOpen(true);
   };
 
-  const handleApply = async (jobId: string) => {
+  const handleApplyRedirect = async (job: Job) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       toast.error("Please login to apply");
       return;
     }
 
+    const applyType = classifyApplyType(job.url);
+
+    if (applyType.type === "unsupported") {
+      toast.error("This job has an invalid link. Please search for it manually.");
+      return;
+    }
+
+    // Open the real job link
+    window.open(job.url, "_blank");
+
+    // Track in database as "pending" (user needs to complete on external site)
     const { error } = await supabase
       .from("applications")
       .insert({
         user_id: user.id,
-        job_id: jobId,
+        job_id: job.id,
         status: "pending",
+        notes: `Apply type: ${applyType.label}. Redirected to ${new URL(job.url).hostname}`,
       });
 
     if (error) {
       if (error.message.includes("duplicate")) {
-        toast.error("You've already applied to this job");
+        toast.info("You've already tracked this application");
       } else {
-        toast.error("Failed to apply");
+        toast.error("Failed to track application");
       }
       return;
     }
 
-    toast.success("Application added to queue!");
-    fetchJobs();
-  };
+    setAppliedJobIds(prev => new Set(prev).add(job.id));
 
-  // Auto-apply with email sending
-  const handleAutoApply = async (job: Job) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      toast.error("Please login to apply");
-      return;
-    }
-
-    setApplyingJobIds(prev => new Set(prev).add(job.id));
-
-    try {
-      // First, generate the application email
-      toast.info(`Generating application for ${job.title}...`);
-      
-      const { data: emailData, error: emailError } = await supabase.functions.invoke("generate-email", {
-        body: {
-          jobId: job.id,
-          userId: user.id,
-          emailType: "application",
-        },
-      });
-
-      if (emailError) {
-        throw new Error("Failed to generate email");
-      }
-
-      // Create HR email from company name
-      const hrEmail = `hr@${job.company.toLowerCase().replace(/[^a-z0-9]/g, '')}.com`;
-
-      // Send the application
-      const { data: sendData, error: sendError } = await supabase.functions.invoke("send-application", {
-        body: {
-          jobId: job.id,
-          userId: user.id,
-          subject: emailData.subject,
-          body: emailData.body,
-          toEmail: hrEmail,
-        },
-      });
-
-      if (sendError) {
-        throw new Error("Failed to send application");
-      }
-
-      toast.success(`🎉 Applied to ${job.title} at ${job.company}! Check your email for confirmation.`);
-      fetchJobs();
-    } catch (error) {
-      console.error("Auto-apply error:", error);
-      toast.error("Failed to auto-apply. Please try again.");
-    } finally {
-      setApplyingJobIds(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(job.id);
-        return newSet;
-      });
+    if (applyType.type === "manual") {
+      toast.info(
+        `📋 Opened ${job.company}'s application page. Complete your application there — we've tracked it for you.`,
+        { duration: 6000 }
+      );
+    } else {
+      toast.success(
+        `🔗 Opened job at ${job.company}. Complete your application and we'll track it.`,
+        { duration: 5000 }
+      );
     }
   };
 
@@ -385,6 +313,7 @@ const JobListings = () => {
   const handleBulkApplyComplete = () => {
     clearSelection();
     fetchJobs();
+    fetchAppliedJobIds();
   };
 
   const selectedJobs = filteredJobs.filter(j => selectedJobIds.has(j.id));
@@ -400,15 +329,11 @@ const JobListings = () => {
   if (filteredJobs.length === 0 && !loading) {
     return (
       <div className="space-y-6">
-        {/* Job Scrape Controls */}
         <JobScrapeControls onJobsUpdated={fetchJobs} />
-        
         <div className="flex items-center justify-between">
           <h2 className="text-2xl font-bold">Matched Jobs</h2>
         </div>
-        
         <JobFilters onFilterChange={setFilters} currentFilters={filters} />
-        
         <Card className="p-8 text-center">
           <Briefcase className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
           <h3 className="text-lg font-semibold mb-2">No jobs found</h3>
@@ -422,7 +347,6 @@ const JobListings = () => {
 
   return (
     <div className="space-y-6">
-      {/* Job Scrape Controls */}
       <JobScrapeControls onJobsUpdated={fetchJobs} />
       
       <div className="flex items-center justify-between">
@@ -430,10 +354,22 @@ const JobListings = () => {
           <h2 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
             Matched Jobs
           </h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            {filteredJobs.length} opportunities found
+          <p className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
+            {filteredJobs.length} verified opportunities
+            <span className="inline-flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
+              <ShieldCheck className="h-3 w-3" />
+              Real links only
+            </span>
           </p>
         </div>
+      </div>
+      
+      {/* Trust banner */}
+      <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-green-500/5 border border-green-200 dark:border-green-800 text-sm text-green-700 dark:text-green-400">
+        <ShieldCheck className="h-4 w-4 shrink-0" />
+        <span>
+          <strong>Honest applications only.</strong> We redirect you to the real job page — no fake submissions. All links are verified.
+        </span>
       </div>
       
       <JobFilters onFilterChange={setFilters} currentFilters={filters} />
@@ -445,6 +381,7 @@ const JobListings = () => {
           const cleanCompany = cleanMarkdownText(job.company);
           const matchScore = matchScores[job.id];
           const isSelected = selectedJobIds.has(job.id);
+          const applyType = classifyApplyType(job.url);
           
           return (
             <Card 
@@ -458,7 +395,6 @@ const JobListings = () => {
               
               <div className="relative p-6 space-y-4">
                 <div className="flex items-start justify-between gap-4">
-                  {/* Checkbox for bulk selection */}
                   <div 
                     className="shrink-0 pt-1"
                     onClick={(e) => toggleJobSelection(job.id, e)}
@@ -527,6 +463,16 @@ const JobListings = () => {
                     >
                       {job.job_type === "internship" ? "🎓 Internship" : "💼 Full-time"}
                     </Badge>
+                    {/* Apply Type Badge */}
+                    <Badge 
+                      variant="outline"
+                      className={`text-[10px] font-semibold ${applyType.badgeColor}`}
+                    >
+                      {applyType.type === "manual" && "🔗 "}
+                      {applyType.type === "direct" && "⚡ "}
+                      {applyType.type === "unsupported" && "⚠️ "}
+                      {applyType.label}
+                    </Badge>
                   </div>
                 </div>
 
@@ -567,21 +513,12 @@ const JobListings = () => {
                       className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg hover:shadow-xl transition-all duration-300 font-semibold"
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleAutoApply(job);
+                        handleApplyRedirect(job);
                       }}
-                      disabled={applyingJobIds.has(job.id)}
+                      disabled={applyType.type === "unsupported"}
                     >
-                      {applyingJobIds.has(job.id) ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                          Applying...
-                        </>
-                      ) : (
-                        <>
-                          <Zap className="h-4 w-4 mr-1" />
-                          Auto Apply
-                        </>
-                      )}
+                      <ExternalLink className="h-4 w-4 mr-1" />
+                      Apply Now
                     </Button>
                   </div>
                 </div>
@@ -597,7 +534,10 @@ const JobListings = () => {
         onOpenChange={setModalOpen}
         matchScore={selectedJob ? matchScores[selectedJob.id] : undefined}
         similarJobs={similarJobs}
-        onApply={handleApply}
+        onApply={(jobId) => {
+          const job = filteredJobs.find(j => j.id === jobId);
+          if (job) handleApplyRedirect(job);
+        }}
         onJobSelect={handleJobClick}
       />
 
@@ -607,16 +547,12 @@ const JobListings = () => {
         totalCount={Math.min(filteredJobs.length, 50)}
         onSelectAll={selectAllJobs}
         onClearSelection={clearSelection}
-        onBulkApply={() => setBulkApplyModalOpen(true)}
+        onBulkApply={() => {
+          // Bulk apply = open all selected job URLs + track them
+          selectedJobs.forEach(job => handleApplyRedirect(job));
+          clearSelection();
+        }}
         isAllSelected={selectedJobIds.size === filteredJobs.length && filteredJobs.length > 0}
-      />
-
-      {/* Bulk Apply Modal */}
-      <BulkApplyModal
-        open={bulkApplyModalOpen}
-        onOpenChange={setBulkApplyModalOpen}
-        selectedJobs={selectedJobs}
-        onComplete={handleBulkApplyComplete}
       />
     </div>
   );
