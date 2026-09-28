@@ -54,7 +54,7 @@ const JobListings = () => {
   useEffect(() => {
     fetchJobs();
     fetchAppliedJobIds();
-  }, [filters.location, filters.jobType]);
+  }, [filters.location, filters.jobType, (filters.keywords || []).join("|")]);
 
   useEffect(() => {
     filterJobsBySalaryAndKeywords();
@@ -88,10 +88,21 @@ const JobListings = () => {
     if (filters.jobType && filters.jobType !== "both") {
       query = query.eq("job_type", filters.jobType);
     }
+
+    // Filter on the server so the whole job database (thousands of jobs) is searchable
+    const clean = (s: string) => s.replace(/[,%()]/g, " ").trim();
+    if (filters.location) {
+      const city = clean(filters.location.split(",")[0].toLowerCase());
+      if (city) query = query.or(`location.ilike.%${city}%,location.ilike.%remote%,location.ilike.%india%`);
+    }
+    const kws = (filters.keywords || []).map(clean).filter(Boolean).slice(0, 10);
+    if (kws.length) {
+      query = query.or(kws.map((k) => `title.ilike.%${k}%`).join(","));
+    }
     
     const { data, error } = await query
       .order("fetched_at", { ascending: false })
-      .limit(2000);
+      .limit(1000);
 
     if (error) {
       toast.error("Failed to fetch jobs");

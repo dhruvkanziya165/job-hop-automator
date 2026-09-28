@@ -81,19 +81,16 @@ const ScrapeHistoryPanel = ({ onJobsUpdated }: ScrapeHistoryPanelProps) => {
   const handleManualScrape = async () => {
     setIsManualScraping(true);
     try {
-      toast.info("Starting manual job scrape...");
+      toast.info("Fetching real jobs from 200+ company career pages... (about 1 minute)");
       
-      const { data, error } = await supabase.functions.invoke("daily-job-scrape", {
-        body: {
-          scrapeType: "manual",
-          keywords: ["software", "developer", "engineer", "data", "product", "design"],
-          locations: ["Bangalore", "Mumbai", "Delhi NCR", "Hyderabad", "Pune"]
-        }
+      const { data, error } = await supabase.functions.invoke("bulk-job-import", {
+        body: { scrapeType: "manual" }
       });
 
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
 
-      toast.success(`🎉 Scrape completed! Added ${data.jobsInserted} new jobs`);
+      toast.success(`Found ${data.jobsFound} jobs, added ${data.jobsInserted} new ones`);
       await fetchLogs();
       onJobsUpdated?.();
     } catch (error: any) {
