@@ -50,3 +50,6 @@ verify_jwt = false
 
 [functions.bulk-job-import]
 verify_jwt = false
+
+[functions.job-search]
+verify_jwt = false
