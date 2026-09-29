@@ -47,6 +47,8 @@ const JobListings = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [similarJobs, setSimilarJobs] = useState<Job[]>([]);
   const [appliedJobIds, setAppliedJobIds] = useState<Set<string>>(new Set());
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 20;
   
   // Bulk selection state
   const [selectedJobIds, setSelectedJobIds] = useState<Set<string>>(new Set());
@@ -58,6 +60,7 @@ const JobListings = () => {
 
   useEffect(() => {
     filterJobsBySalaryAndKeywords();
+    setPage(1);
   }, [jobs, filters.salaryMin, filters.salaryMax, filters.keywords]);
 
   useEffect(() => {
@@ -328,6 +331,9 @@ const JobListings = () => {
   };
 
   const selectedJobs = filteredJobs.filter(j => selectedJobIds.has(j.id));
+  const totalPages = Math.max(1, Math.ceil(filteredJobs.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pagedJobs = filteredJobs.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   if (loading) {
     return (
@@ -386,7 +392,7 @@ const JobListings = () => {
       <JobFilters onFilterChange={setFilters} currentFilters={filters} />
 
       <div className="grid gap-4">
-        {filteredJobs.map((job) => {
+        {pagedJobs.map((job) => {
           const cleanTitle = cleanMarkdownText(job.title);
           const cleanDescription = cleanMarkdownText(job.description || "");
           const cleanCompany = cleanMarkdownText(job.company);
@@ -538,6 +544,20 @@ const JobListings = () => {
           );
         })}
       </div>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-3 pt-2">
+          <Button variant="outline" size="sm" disabled={safePage <= 1}
+            onClick={() => { setPage(safePage - 1); window.scrollTo({ top: 0, behavior: "smooth" }); }}>
+            Previous
+          </Button>
+          <span className="text-sm text-muted-foreground">Page {safePage} of {totalPages}</span>
+          <Button variant="outline" size="sm" disabled={safePage >= totalPages}
+            onClick={() => { setPage(safePage + 1); window.scrollTo({ top: 0, behavior: "smooth" }); }}>
+            Next
+          </Button>
+        </div>
+      )}
 
       <JobDetailsModal
         job={selectedJob}

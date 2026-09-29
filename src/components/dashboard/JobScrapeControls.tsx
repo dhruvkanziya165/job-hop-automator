@@ -72,22 +72,19 @@ const JobScrapeControls = ({ onJobsUpdated }: JobScrapeControlsProps) => {
     setProgress(10);
 
     try {
-      toast.info(`Generating ${jobCount} India-focused jobs...`);
+      toast.info("Fetching real jobs from company career pages...");
       setProgress(30);
 
-      const { data, error } = await supabase.functions.invoke("seed-india-jobs", {
-        body: {
-          count: parseInt(jobCount),
-          location: selectedCity,
-          category: selectedCategory
-        }
+      const { data, error } = await supabase.functions.invoke("bulk-job-import", {
+        body: { scrapeType: "manual" },
       });
 
       setProgress(90);
 
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
 
-      toast.success(`🎉 Added ${data.jobsInserted} new jobs!`);
+      toast.success(`Found ${data.jobsFound} real jobs, ${data.jobsInserted} new.`);
       setProgress(100);
       await fetchStats();
       onJobsUpdated();
@@ -254,12 +251,12 @@ const JobScrapeControls = ({ onJobsUpdated }: JobScrapeControlsProps) => {
                   {isSeeding ? (
                     <>
                       <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                      Generating Jobs...
+                      Fetching Real Jobs...
                     </>
                   ) : (
                     <>
                       <Zap className="mr-2 h-5 w-5" />
-                      Add {jobCount}+ Jobs Instantly
+                      Refresh Real Jobs Now
                     </>
                   )}
                 </Button>
