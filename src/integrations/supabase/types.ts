@@ -690,6 +690,8 @@ export type Database = {
           file_size: number | null
           id: string
           is_default: boolean | null
+          parsed_at: string | null
+          parsed_text: string | null
           role_type: string | null
           user_id: string
         }
@@ -700,6 +702,8 @@ export type Database = {
           file_size?: number | null
           id?: string
           is_default?: boolean | null
+          parsed_at?: string | null
+          parsed_text?: string | null
           role_type?: string | null
           user_id: string
         }
@@ -710,6 +714,8 @@ export type Database = {
           file_size?: number | null
           id?: string
           is_default?: boolean | null
+          parsed_at?: string | null
+          parsed_text?: string | null
           role_type?: string | null
           user_id?: string
         }
