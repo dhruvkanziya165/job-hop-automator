@@ -2,9 +2,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Building2, MapPin, DollarSign, ExternalLink, Clock, Briefcase, CheckCircle2, Lightbulb, ShieldCheck, AlertTriangle } from "lucide-react";
+import { Building2, MapPin, DollarSign, ExternalLink, Clock, Briefcase, CheckCircle2, Lightbulb, ShieldCheck, AlertTriangle, FileText } from "lucide-react";
+import { useState } from "react";
 import { CircularProgress } from "./CircularProgress";
 import { classifyApplyType, cleanMarkdownText } from "@/lib/jobUtils";
+import { ResumeJobScore } from "./ResumeJobScore";
+import { ApplyFormDialog } from "./ApplyFormDialog";
 
 interface Job {
   id: string;
@@ -38,11 +41,14 @@ export const JobDetailsModal = ({
   onApply,
   onJobSelect
 }: JobDetailsModalProps) => {
+  const [formOpen, setFormOpen] = useState(false);
   if (!job) return null;
 
   const applyType = classifyApplyType(job.url);
 
   return (
+    <>
+    <ApplyFormDialog job={job} open={formOpen} onOpenChange={setFormOpen} />
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
@@ -185,12 +191,24 @@ export const JobDetailsModal = ({
             </>
           )}
 
+          <ResumeJobScore jobId={job.id} />
+
           {/* Actions */}
-          <div className="flex gap-3 pt-4">
+          <div className="flex flex-col sm:flex-row gap-3 pt-4">
+            <Button
+              onClick={() => setFormOpen(true)}
+              disabled={applyType.type === "unsupported"}
+              className="flex-1"
+              size="lg"
+            >
+              <FileText className="h-4 w-4 mr-2" />
+              Apply with my details
+            </Button>
             <Button
               onClick={() => onApply(job.id)}
               disabled={applyType.type === "unsupported"}
-              className="flex-1 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
+              variant="secondary"
+              className="flex-1"
               size="lg"
             >
               <ExternalLink className="h-4 w-4 mr-2" />
@@ -208,5 +226,6 @@ export const JobDetailsModal = ({
         </div>
       </DialogContent>
     </Dialog>
+    </>
   );
 };
