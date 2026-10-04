@@ -226,5 +226,6 @@ export const JobDetailsModal = ({
         </div>
       </DialogContent>
     </Dialog>
+    </>
   );
 };
